@@ -16,9 +16,9 @@ def test_blackboard_class():
         blackboard = Blackboard(directory + "/blackboard")
 
         # Write the contents of the README.md file
-        blackboard.write_markdown("README.md", "Hello, World!")
+        blackboard.write_text_file("README.md", "Hello, World!")
         # Read the contents of the README.md file
-        readme = blackboard.read_markdown("README.md")
+        readme = blackboard.read_text_file("README.md")
         # Ensure the README.md file contains the expected contents
         assert readme == "Hello, World!"
 
@@ -26,6 +26,6 @@ def test_blackboard_class():
         blackboard.commit("Update README.md")
 
         # Read the contents of the README.md file
-        readme = blackboard.read_markdown("README.md")
+        readme = blackboard.read_text_file("README.md")
         # Ensure the README.md file contains the expected contents
         assert readme == "Hello, World!"

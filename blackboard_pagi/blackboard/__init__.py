@@ -14,8 +14,42 @@ to the Blackboard.
 """
 import pathlib
 import shutil
+from dataclasses import dataclass
 
+import frontmatter
 import git
+
+
+@dataclass
+class MarkdownContent:
+    """Represents the content of a markdown file.
+
+    We have the following attributes:
+        - 'frontmatter': The frontmatter of the markdown file (as dict).
+        - 'body': The body of the markdown file.
+
+    We also have the following methods:
+        - 'dumps': Returns the combined content as a string.
+
+    We also have the following static methods:
+        - 'loads': Creates a MarkdownContent object from a string.
+
+    Note: because of the frontmatter library, the frontmatter does not support properties with the
+    names "content", "metadata", or "self"... :|
+    """
+
+    frontmatter: dict
+    body: str
+
+    def dumps(self) -> str:
+        """Returns the combined content as a string."""
+        return frontmatter.dumps(frontmatter.Post(body=self.body, **self.frontmatter))
+
+    @staticmethod
+    def loads(string):
+        """Creates a MarkdownContent object from a string."""
+        post = frontmatter.loads(string)
+        return MarkdownContent(post.metadata, post.content)
 
 
 class Blackboard:
@@ -86,17 +120,29 @@ class Blackboard:
         """
         (self.working_dir / path).touch()
 
-    def read_markdown(self, path):
+    def read_text_file(self, path):
         """
-        Read the contents of a markdown file.
+        Read the contents of a text file.
         """
         return (self.working_dir / path).read_text()
 
-    def write_markdown(self, path, contents):
+    def write_text_file(self, path, contents):
+        """
+        Write contents to a text file.
+        """
+        (self.working_dir / path).write_text(contents)
+
+    def read_markdown_file(self, path):
+        """
+        Read the contents of a markdown file.
+        """
+        return MarkdownContent.loads(self.read_text_file(path))
+
+    def write_markdown_file(self, path, contents):
         """
         Write contents to a markdown file.
         """
-        (self.working_dir / path).write_text(contents)
+        self.write_text_file(path, contents.dumps())
 
     def commit(self, message):
         """
