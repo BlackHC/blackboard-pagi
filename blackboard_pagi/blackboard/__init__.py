@@ -7,6 +7,7 @@ This file implements the Blackboard class, which is a wrapper around a git repos
 """
 import git
 import os
+import pathlib
 
 class Blackboard:
     """
@@ -27,21 +28,21 @@ class Blackboard:
         """
         Initialize the Blackboard class.
         """
-        if not os.path.isdir(directory):
+        self.working_dir = pathlib.Path(directory)
+        
+        if not self.working_dir.is_dir():
             # Create a git repository if it doesn't exist
             repo = git.Repo.init(directory)
             # Create a .gitignore file if it doesn't exist
-            with open(os.path.join(directory, ".gitignore"), "w") as file:
-                file.write(".DS_Store")
+            (self.working_dir / ".gitignore").write_text(".DS_Store")
             # Create a README.md file if it doesn't exist
-            with open(os.path.join(directory, "README.md"), "w") as file:
-                file.write("# Blackboard")
+            (self.working_dir / "README.md").write_text("# Blackboard")
             # Commit the initial changes
             repo.index.add([".gitignore", "README.md"])
             repo.index.commit("Initialize Blackboard")
         else:
             # Check if the directory is a git repository
-            if not os.path.isdir(os.path.join(directory, ".git")):
+            if not (self.working_dir / ".git").is_dir():
                 raise Exception("The specified directory is not a git repository.")
 
         # Open the git repository
@@ -49,8 +50,6 @@ class Blackboard:
         # Ensure the git repository is not bare
         if self.repo.bare:
             raise Exception("The specified directory is a bare git repository.")
-        # Create a git working directory
-        self.working_dir = self.repo.working_dir
         # Create a git index
         self.index = self.repo.index
         # Create a git tree
@@ -58,20 +57,37 @@ class Blackboard:
         # Create a git head
         self.head = self.repo.head
 
+    def get_local_path(self, path):
+        """
+        Get the local path of a file or directory.
+        """
+        return self.working_dir / path
+
+    def create_empty_directory(self, path):
+        """
+        Create an empty directory with a .gitkeep file.
+        """
+        (self.working_dir / path).mkdir()
+        (self.working_dir / path / ".gitkeep").touch()
+
+    def touch_file(self, path):
+        """
+        Create an empty file.
+        """
+        (self.working_dir / path).touch()
+
     def read_markdown(self, path):
         """
         Read the contents of a markdown file.
         """
-        with open(os.path.join(self.working_dir, path), "r") as file:
-            return file.read()
+        return (self.working_dir / path).read_text()
 
     def write_markdown(self, path, contents):
         """
         Write contents to a markdown file.
         """
-        with open(os.path.join(self.working_dir, path), "w") as file:
-            file.write(contents)
-
+        (self.working_dir / path).write_text(contents)
+        
     def commit(self, message):
         """
         Commit changes to the Blackboard.
