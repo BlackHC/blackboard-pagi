@@ -51,6 +51,7 @@ langchain = {extras = ["all"], version = "^0.0.38"}
 ipykernel = {version = "^6.19.2", optional = true}
 gitpython = "^3.1.29"
 pip = "^22.3.1"
+openai = "^0.25.0"
 
 [tool.poetry.extras]
 test = [
