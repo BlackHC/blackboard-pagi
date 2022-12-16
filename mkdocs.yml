@@ -7,9 +7,13 @@ nav:
   - Home: index.md
   - Installation: installation.md
   - Usage: usage.md
+  - Concepts:
+      - Blackboard: concepts/blackboard.md
   - Modules: api.md
   - Contributing: contributing.md
   - Changelog: changelog.md
+watch:
+  - blackboard_pagi
 theme:
   name: material
   language: en
@@ -49,9 +53,7 @@ plugins:
   - include-markdown
   - search:
       lang: en
-  - mkdocstrings:
-      watch:
-        - blackboard-pagi
+  - mkdocstrings
 extra:
   social:
     - icon: fontawesome/brands/twitter
