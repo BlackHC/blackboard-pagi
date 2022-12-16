@@ -14,8 +14,6 @@ def test_blackboard_class():
     with tempfile.TemporaryDirectory() as directory:
         # Initialize the Blackboard class
         blackboard = Blackboard(directory + "/blackboard")
-        # Read the contents of the README.md file
-        readme = blackboard.read_markdown("README.md")
 
         # Write the contents of the README.md file
         blackboard.write_markdown("README.md", "Hello, World!")
