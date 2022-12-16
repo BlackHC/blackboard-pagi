@@ -39,14 +39,48 @@ class Blackboard:
         self.working_dir = pathlib.Path(directory)
 
         if not self.working_dir.is_dir():
+            # TODO: move this into its own method.
             # Create a git repository if it doesn't exist
             repo = git.Repo.init(directory)
             # Create a .gitignore file if it doesn't exist
             (self.working_dir / ".gitignore").write_text(".DS_Store")
             # Create a README.md file if it doesn't exist
             (self.working_dir / "README.md").write_text("# Blackboard")
-            # Commit the initial changes
-            repo.index.add([".gitignore", "README.md"])
+            # Create directories for: reference data, knowledge, tasks, skills, and self
+            self.create_persisted_directory("reference data")
+            self.create_persisted_directory("knowledge")
+            self.create_persisted_directory("tasks")
+            self.create_persisted_directory("skills")
+            self.create_persisted_directory("self")
+            # Create README.md files for: reference data, knowledge, tasks, skills, and self with
+            # a short description of what each directory is for
+            self.write_markdown(
+                "reference data/README.md",
+                "# Reference Data\n\nThis directory contains reference data, which is data that is used to "
+                "represent the current state of the world. Reference data is stored in Obsidian markdown files.",
+            )
+            self.write_markdown(
+                "knowledge/README.md",
+                "# Knowledge\n\nThis directory contains knowledge, which is data that is used to represent the "
+                "current state of the agent's mind. Knowledge is stored in Obsidian markdown files.",
+            )
+            self.write_markdown(
+                "tasks/README.md",
+                "# Tasks\n\nThis directory contains tasks, which are actions that the agent plans to perform. "
+                "Tasks are stored in Obsidian markdown files.",
+            )
+            self.write_markdown(
+                "skills/README.md",
+                "# Skills\n\nThis directory contains skills, which are actions that the agent can perform. "
+                "Skills are stored in Obsidian markdown files.",
+            )
+            self.write_markdown(
+                "self/README.md",
+                "# Self\n\nThis directory contains self, which is data that is used to represent the current "
+                "state of the agent's processes. Self is stored in Obsidian markdown files.",
+            )
+            # Commit all initial changes
+            repo.index.add(["."])
             repo.index.commit("Initialize Blackboard")
         else:
             # Check if the directory is a git repository
@@ -71,7 +105,7 @@ class Blackboard:
         """
         return self.working_dir / path
 
-    def create_empty_directory(self, path):
+    def create_persisted_directory(self, path):
         """
         Create an empty directory with a .gitkeep file.
         """
