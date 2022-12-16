@@ -49,6 +49,7 @@ jinja2 = {version = "<3.1.0", optional = false}
 blackhc-project = "^2.6.0"
 langchain = {extras = ["all"], version = "^0.0.38"}
 ipykernel = {version = "^6.19.2", optional = true}
+gitpython = "^3.1.29"
 
 [tool.poetry.extras]
 test = [
