@@ -13,7 +13,7 @@ classifiers=[
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
     'Natural Language :: English',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.8.1',
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
@@ -21,6 +21,8 @@ classifiers=[
 packages = [
     { include = "blackboard_pagi" },
     { include = "tests", format = "sdist" },
+    # Include all files under blackboard_pagi/blackboard/template
+    { include = "blackboard_pagi/blackboard/template/**/*" }
 ]
 
 [tool.poetry.dependencies]
@@ -53,7 +55,6 @@ gitpython = "^3.1.29"
 pip = "^22.3.1"
 openai = "^0.25.0"
 manifest-ml = "^0.0.1"
-chatgpt = "^2.2212.0"
 
 [tool.poetry.extras]
 test = [

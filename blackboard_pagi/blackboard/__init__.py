@@ -13,6 +13,7 @@ Blackboard class provides methods for reading and writing to the Blackboard, as 
 to the Blackboard.
 """
 import pathlib
+import shutil
 
 import git
 
@@ -40,47 +41,14 @@ class Blackboard:
 
         if not self.working_dir.is_dir():
             # TODO: move this into its own method.
+            # Copy files in the template directory (under this sub-package) to Blackboard directory
+            template_dir = pathlib.Path(__file__).parent / "template"
+            shutil.copytree(template_dir, directory)
             # Create a git repository if it doesn't exist
             repo = git.Repo.init(directory)
-            # Create a .gitignore file if it doesn't exist
-            (self.working_dir / ".gitignore").write_text(".DS_Store")
-            # Create a README.md file if it doesn't exist
-            (self.working_dir / "README.md").write_text("# Blackboard")
-            # Create directories for: reference data, knowledge, tasks, skills, and self
-            self.create_persisted_directory("reference data")
-            self.create_persisted_directory("knowledge")
-            self.create_persisted_directory("tasks")
-            self.create_persisted_directory("skills")
-            self.create_persisted_directory("self")
-            # Create README.md files for: reference data, knowledge, tasks, skills, and self with
-            # a short description of what each directory is for
-            self.write_markdown(
-                "reference data/README.md",
-                "# Reference Data\n\nThis directory contains reference data, which is data that is used to "
-                "represent the current state of the world. Reference data is stored in Obsidian markdown files.",
-            )
-            self.write_markdown(
-                "knowledge/README.md",
-                "# Knowledge\n\nThis directory contains knowledge, which is data that is used to represent the "
-                "current state of the agent's mind. Knowledge is stored in Obsidian markdown files.",
-            )
-            self.write_markdown(
-                "tasks/README.md",
-                "# Tasks\n\nThis directory contains tasks, which are actions that the agent plans to perform. "
-                "Tasks are stored in Obsidian markdown files.",
-            )
-            self.write_markdown(
-                "skills/README.md",
-                "# Skills\n\nThis directory contains skills, which are actions that the agent can perform. "
-                "Skills are stored in Obsidian markdown files.",
-            )
-            self.write_markdown(
-                "self/README.md",
-                "# Self\n\nThis directory contains self, which is data that is used to represent the current "
-                "state of the agent's processes. Self is stored in Obsidian markdown files.",
-            )
-            # Commit all initial changes
+            # Add all files to the index
             repo.index.add(["."])
+            # Commit all initial changes
             repo.index.commit("Initialize Blackboard")
         else:
             # Check if the directory is a git repository
