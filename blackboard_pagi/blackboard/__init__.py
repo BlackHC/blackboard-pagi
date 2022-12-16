@@ -1,13 +1,21 @@
 """
 Based on docs/concepts/blackboard.md TK overview actually chatgpt TK:
 
-> PAGI is an artificial general intelligence that uses a data sandbox called the Blackboard to store information about its reference data (the current state of the world), knowledge (the current state of its own mind), tasks (the current state of its plans), skills (the current state of its abilities and experience), and self (the current state of its processes). The Blackboard is stored in a git repository and uses Obsidian markdown files to store metadata and allow for viewing in a web browser or desktop application. Git's version control system and branching/merging capabilities allow for tracking changes to the Blackboard and for exploration and experimentation.
+> PAGI is an artificial general intelligence that uses a data sandbox called the Blackboard to store information about
+ its reference data (the current state of the world), knowledge (the current state of its own mind), tasks (the current
+ state of its plans), skills (the current state of its abilities and experience), and self (the current state of its
+ processes). The Blackboard is stored in a git repository and uses Obsidian markdown files to store metadata and allow
+ for viewing in a web browser or desktop application. Git's version control system and branching/merging capabilities
+ allow for tracking changes to the Blackboard and for exploration and experimentation.
 
-This file implements the Blackboard class, which is a wrapper around a git repository of Obsidian markdown files. The Blackboard class provides methods for reading and writing to the Blackboard, as well as methods for committing changes to the Blackboard.
+This file implements the Blackboard class, which is a wrapper around a git repository of Obsidian markdown files. The
+Blackboard class provides methods for reading and writing to the Blackboard, as well as methods for committing changes
+to the Blackboard.
 """
-import git
-import os
 import pathlib
+
+import git
+
 
 class Blackboard:
     """
@@ -23,13 +31,13 @@ class Blackboard:
         - A .gitignore file will be created in the specified directory
         - A README.md file will be created in the specified directory
     """
-    
+
     def __init__(self, directory):
         """
         Initialize the Blackboard class.
         """
         self.working_dir = pathlib.Path(directory)
-        
+
         if not self.working_dir.is_dir():
             # Create a git repository if it doesn't exist
             repo = git.Repo.init(directory)
@@ -87,10 +95,9 @@ class Blackboard:
         Write contents to a markdown file.
         """
         (self.working_dir / path).write_text(contents)
-        
+
     def commit(self, message):
         """
         Commit changes to the Blackboard.
         """
         self.index.commit(message)
-
