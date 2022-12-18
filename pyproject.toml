@@ -58,6 +58,7 @@ manifest-ml = "^0.0.1"
 python-frontmatter = "^1.0.0"
 matplotlib = "^3.6.2"
 pillow = "^9.3.0"
+parse = {version = "^1.19.0", optional = true}
 
 [tool.poetry.extras]
 test = [
@@ -83,6 +84,9 @@ doc = [
 
 [tool.poetry.scripts]
 blackboard-pagi = 'blackboard_pagi.cli:main'
+
+[tool.poetry.group.dev.dependencies]
+parse = {version = "^1.19.0", optional = true}
 
 [tool.black]
 line-length = 120
