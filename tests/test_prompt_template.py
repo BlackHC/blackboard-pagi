@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from blackboard_pagi import prompt_template
+from blackboard_pagi.prompts import prompt_template
 
 
 @prompt_template.prompt_template("What is the meaning of life?")
@@ -48,5 +48,5 @@ class HelloName(prompt_template.PromptTemplateMixin):
 
 def test_prompt_template_mixin():
     """Test prompt template mixin with dataclass."""
-    assert HelloName("Bob").to_prompt() == "Hello, Bob!"
-    assert HelloName.from_prompt("Hello, John!") == HelloName("John")
+    assert HelloName("Bob").render() == "Hello, Bob!"
+    assert HelloName.parse("Hello, John!") == HelloName("John")

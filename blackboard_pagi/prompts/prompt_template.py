@@ -1,7 +1,10 @@
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, TypeVar
 
 import parse
+from typing_extensions import dataclass_transform
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -12,14 +15,14 @@ class PromptTemplateMixin:
 
     prompt_template: ClassVar[str]
 
-    def to_prompt(self) -> str:
+    def render(self) -> str:
         """
         Returns a prompt string with the given arguments.
         """
         return self.__class__.prompt_template.format(**vars(self))
 
     @classmethod
-    def from_prompt(cls, text: str):
+    def parse(cls, text: str):
         result = parse.parse(cls.prompt_template, text)
         if result is None:
             raise ValueError(f"Could not parse prompt {text}")
@@ -29,7 +32,7 @@ class PromptTemplateMixin:
         return prompt_instance
 
     def __call__(self) -> str:
-        return self.to_prompt()
+        return self.render()
 
 
 def prompt_template(prompt_template: str, as_dataclass=True):
@@ -37,7 +40,8 @@ def prompt_template(prompt_template: str, as_dataclass=True):
     Wraps a class to make it a prompt template.
     """
 
-    def prompt_wrapper(class_definition):
+    @dataclass_transform()
+    def prompt_wrapper(class_definition: type) -> type:
         if as_dataclass:
             class_definition = dataclass(class_definition)
 

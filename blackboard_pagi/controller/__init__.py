@@ -18,7 +18,7 @@ from typing import Optional
 import langchain
 import yaml
 
-from blackboard_pagi import prompt_template
+from blackboard_pagi.prompts import prompt_template
 
 
 @dataclass
@@ -38,17 +38,17 @@ can invoke a Google search for "OpenAI" by ending your answer with:
 ```yaml
 
 ---
-tool: search-google
+invoke-tool: search-google
 query: OpenAI
+---
 ```
-
-Note that we do not include the `---` at the end of the YAML block in the answer.
 
 You must include a tool property in the YAML block with the name of the tool you want to invoke.
 You can also pass parameters using YAML syntax depending on the tool (see the definitions below).
 
 If you don't want to invoke a tool, you can end your answer with a YAML block that contains a `tool` property with
-the value `none` to indicate that you don't want to invoke a tool.
+the value `none` to indicate that you don't want to invoke a tool. Make sure to always include an answer, even if
+it is just a single word and do not end your answer with a YAML block if you don't want to invoke a tool.
 
 You have the following tools available with the parameters specified using $parameter syntax:
 - "search-google": search Google for a $query and return the top $num_results results (default: 1).
@@ -63,7 +63,6 @@ For example, if you invoke the `search-google` tool, we will return the top resu
 
 For example:
 ```yaml
-
 ---
 tool: search-google
 query: OpenAI
@@ -75,9 +74,6 @@ result:
 ---
 
 ```
-
-Note the extra newlines and final --- at the end of the YAML block. This is required to indicate the end of the
-YAML block.
 
 Now, we will give your the main task. Think step by step and try to solve the problem. You can use the tools
 described above to help you solve the problem. Try to write valid markdown in your answer except for the YAML
@@ -287,7 +283,7 @@ class Kernel:
         answer_blocks = []
         main_prompt = MainPromptTemplate(user_prompt)
         while True:
-            full_context = main_prompt + "".join(answer_blocks)
+            full_context = main_prompt() + "".join(answer_blocks)
             answer = self.llm(full_context)
             answer_blocks.append(answer)
 
@@ -297,7 +293,7 @@ class Kernel:
                 full_answer = "".join(answer_blocks)
                 original_answers.append(full_answer)
                 summarized_answer = self.summarize(user_prompt, full_answer)
-                approx_summarized_num_tokens = approximate_token_count(main_prompt + summarized_answer)
+                approx_summarized_num_tokens = approximate_token_count(main_prompt() + summarized_answer)
                 assert approx_summarized_num_tokens <= token_limit and approx_summarized_num_tokens < approx_num_tokens
 
                 answer_blocks = [summarized_answer]
@@ -332,9 +328,7 @@ class Kernel:
 
                 if tool == "search-google":
                     # Search Google for the query and return the top result
-                    query = yaml_block["query"]
-                    num_results = yaml_block.get("num_results", 1)
-                    result = self.search_google(query, num_results)
+                    result = self.search_google(str(yaml_block))
                     # result = "Time-out :("
                     answer_blocks.append(f"""\nresult: {result}\n---\n\n""")
                 elif tool == "ask-user":
