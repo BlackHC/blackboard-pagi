@@ -149,3 +149,15 @@ class Blackboard:
         Commit changes to the Blackboard.
         """
         self.index.commit(message)
+
+    def store(self, data):
+        """
+        Store data to the Blackboard.
+        """
+        raise NotImplementedError()
+
+    def lookup(self, query):
+        """
+        Lookup data in the Blackboard.
+        """
+        raise NotImplementedError()

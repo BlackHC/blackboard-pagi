@@ -32,5 +32,7 @@ repos:
     hooks:
       - id: mypy
         exclude: tests/
+        language_version: python3.11
         additional_dependencies:
           - types-click
+          - types-PyYAML
