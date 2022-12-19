@@ -28,6 +28,9 @@ class PromptTemplateMixin:
         prompt_instance = cls(**result.named)  # type: ignore
         return prompt_instance
 
+    def __call__(self) -> str:
+        return self.to_prompt()
+
 
 def prompt_template(prompt_template: str, as_dataclass=True):
     """

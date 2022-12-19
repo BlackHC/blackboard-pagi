@@ -16,17 +16,17 @@ def encode_embedding(embedding: np.ndarray):
     # Convert embeddings to raw byte array
     embedding_bytes = embedding.tobytes()
     assert len(embedding_bytes) == embedding.size * embedding.itemsize
-    embedding_bytes = np.frombuffer(embedding_bytes, dtype=np.uint8)
+    embedding_np_bytes = np.frombuffer(embedding_bytes, dtype=np.uint8)
     square_size = (len(embedding_bytes) / 3) ** 0.5
     square_size = int(np.ceil(square_size))
     # Pad with zeros
-    embedding_bytes = np.pad(
-        embedding_bytes, (0, square_size**2 * 3 - len(embedding_bytes)), mode="constant", constant_values=0
+    embedding_np_bytes = np.pad(
+        embedding_np_bytes, (0, square_size**2 * 3 - len(embedding_bytes)), mode="constant", constant_values=0
     )
     # Reshape
-    embedding_bytes = embedding_bytes.reshape((square_size, square_size, 3))
+    embedding_np_bytes = embedding_np_bytes.reshape((square_size, square_size, 3))
     # Convert to png
-    image = PIL.Image.fromarray(embedding_bytes, mode="RGB")
+    image = PIL.Image.fromarray(embedding_np_bytes, mode="RGB")
     image_bytes_io = io.BytesIO()
     image.save(image_bytes_io, format="png")
     image_bytes = image_bytes_io.getvalue()

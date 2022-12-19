@@ -18,11 +18,16 @@ from typing import Optional
 import langchain
 import yaml
 
+from blackboard_pagi import prompt_template
 
-def generate_main_prompt(prompt: str) -> str:
-    """Generate a prompt for the Blackboard PAGI."""
-    return (
-        """"You are a large language model and act as a virtual assistant that has access to a scratchpad for documents,
+
+@dataclass
+class MainPromptTemplate(prompt_template.PromptTemplateMixin):
+    """A main prompt for the Blackboard PAGI."""
+
+    user_prompt: str
+
+    prompt_template = """You are a large language model and act as a virtual assistant that has access to a scratchpad for documents,
 which we call a blackboard.
 
 # Instructions
@@ -37,19 +42,21 @@ tool: search-google
 query: OpenAI
 ```
 
+Note that we do not include the `---` at the end of the YAML block in the answer.
+
 You must include a tool property in the YAML block with the name of the tool you want to invoke.
 You can also pass parameters using YAML syntax depending on the tool (see the definitions below).
 
 If you don't want to invoke a tool, you can end your answer with a YAML block that contains a `tool` property with
 the value `none` to indicate that you don't want to invoke a tool.
 
-You have the following tools available with the parameters specified using {parameter} syntax:
-- "search-google": search Google for a {query} and return the top {num_results} results (default: 1).
-- "search-wikipedia": search Wikipedia for a {query} and return the top {num_results} results (default: 1)..
-- "memorize": memorize {note} on the blackboard. You can then recall the note using the `recall` tool below.
-- "recall": recall the {association} from the blackboard. We match the {association} using its semantic to
-    all the notes on the blackboard and return the top {num_results} results (default: 1).
-- "ask-user": ask the user a {question} and return the user's response.
+You have the following tools available with the parameters specified using $parameter syntax:
+- "search-google": search Google for a $query and return the top $num_results results (default: 1).
+- "search-wikipedia": search Wikipedia for a $query and return the top $num_results results (default: 1)..
+- "memorize": memorize $note on the blackboard. You can then recall the note using the `recall` tool below.
+- "recall": recall the $association from the blackboard. We match the $association using its semantic to
+    all the notes on the blackboard and return the top $num_results results (default: 1).
+- "ask-user": ask the user a $question and return the user's response.
 
 After you stop, we will execute the tool you invoked and return the result in the YAML block in a 'result' property.
 For example, if you invoke the `search-google` tool, we will return the top result in the YAML block as follows:
@@ -78,19 +85,21 @@ block at the end of your answer.
 
 # Prompt
 
-"""
-        + prompt
-        + """
+{user_prompt}
 
 # Answer
 
 """
-    )
 
 
-def generate_summarization_prompt(prompt: str, answer: str) -> str:
-    """Generate a prompt for summarizing the context so far."""
-    return f"""You are a large language assistant. You have hit your token limit for a request and we are going to summarize the
+@dataclass
+class SummarizePromptTemplate(prompt_template.PromptTemplateMixin):
+    """A prompt for summarizing the context so far."""
+
+    user_prompt: str
+    answer: str
+
+    prompt_template = """You are a large language assistant. You have hit your token limit for a request and we are going to summarize the
 answer below to reduce the prompt token count and ensure enough tokens are available to generate a full response by you
 later.
 
@@ -103,7 +112,7 @@ them.
 
 # Prompt
 
-{prompt}
+{user_prompt}
 
 # Answer
 
@@ -184,10 +193,13 @@ def wrap_yaml_blocks_as_source(text: str) -> str:
     return transformed_text.strip()
 
 
-def emulate_google_tool(query, top_results):
-    """Emulate lookup tools."""
-    return (
-        """You are a large language assistant. You are emulating Google search now (for integration testing purposes).
+@dataclass
+class SearchGooglePromptTemplate(prompt_template.PromptTemplateMixin):
+    """A prompt for the search-google tool."""
+
+    invocation: str
+
+    prompt_template = """You are a large language assistant. You are emulating Google search now (for integration testing purposes).
 You are given a YAML block with a query (`query` property) and a number of results to return (`num_results` property,
 or default: 1).
 
@@ -223,22 +235,21 @@ result:
 ---
 ```
 
-# Query
+# Invocation
 
-"""
-        + query
-        + """
+---
+{invocation}
+---
 
 # Result YAML Block
 
 """
-    )
 
 
-def generate_note(prompt: str, answer: str) -> str:
+def generate_note(user_prompt: str, answer: str) -> str:
     """Generate a note for the blackboard."""
     document = f"""# Prompt
-{prompt}
+{user_prompt}
 
 # Answer
 
@@ -259,14 +270,14 @@ class Kernel:
     def __init__(self, llm: langchain.llms.LLM):
         self.llm = llm
 
-    def summarize(self, prompt: str, answer: str) -> str:
+    def summarize(self, user_prompt: str, answer: str) -> str:
         """Summarize the answer so far."""
-        meta_prompt = generate_summarization_prompt(prompt, answer)
-        summarized_answer = self.llm(meta_prompt)
+        meta_prompt = SummarizePromptTemplate(user_prompt, answer)
+        summarized_answer = self.llm(meta_prompt())
 
         return summarized_answer
 
-    def _main_prompt(self, prompt, token_limit=2000):
+    def _main_prompt(self, user_prompt, token_limit=2000):
         """Execute a prompt and return the answer.
 
         Extract YAMLs from the continunations and execute them as needed.
@@ -274,7 +285,7 @@ class Kernel:
         """
         original_answers = []
         answer_blocks = []
-        main_prompt = generate_main_prompt(prompt)
+        main_prompt = MainPromptTemplate(user_prompt)
         while True:
             full_context = main_prompt + "".join(answer_blocks)
             answer = self.llm(full_context)
@@ -285,7 +296,7 @@ class Kernel:
                 # We have hit the token limit. Summarize the answer so far.
                 full_answer = "".join(answer_blocks)
                 original_answers.append(full_answer)
-                summarized_answer = self.summarize(main_prompt, full_answer)
+                summarized_answer = self.summarize(user_prompt, full_answer)
                 approx_summarized_num_tokens = approximate_token_count(main_prompt + summarized_answer)
                 assert approx_summarized_num_tokens <= token_limit and approx_summarized_num_tokens < approx_num_tokens
 
@@ -335,13 +346,14 @@ class Kernel:
                 else:
                     raise NotImplementedError(f"Unknown tool {tool}")
 
-        return generate_note(prompt, "".join(answer_blocks))
+        return generate_note(user_prompt, "".join(answer_blocks))
 
-    def search_google(self, query, num_results):
+    def search_google(self, yaml_parameters: str):
         """Search Google for the query and return the top result."""
         # Use the emulator for now
-        prompt = emulate_google_tool(query, num_results)
-        answer = self.llm(prompt)
+        prompt = SearchGooglePromptTemplate(yaml_parameters)
+        answer = self.llm(prompt())
+
         # Print the prompt and answer
         print(prompt)
         print(answer)
