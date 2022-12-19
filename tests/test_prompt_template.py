@@ -29,7 +29,6 @@ def test_prompt_template():
 def test_prompt_template_with_dataclass():
     """Test prompt template with dataclass."""
     assert MeaningOf("Life").to_prompt() == "What is the meaning of life?"
-    print(MeaningOf.from_prompt("What is the meaning of life?"))
     assert MeaningOf.from_prompt("What is the meaning of life?") == MeaningOf("Life")
 
     assert MeaningOf("Death").to_prompt() == "What is the meaning of death?"
@@ -39,3 +38,15 @@ def test_prompt_template_from_prompt_failure():
     """Test prompt template from prompt failure."""
     with pytest.raises(ValueError):
         MeaningOfLife.from_prompt("What is the meaning of death?")
+
+
+@dataclass
+class HelloName(prompt_template.PromptTemplateMixin):
+    prompt_template = "Hello, {name}!"
+    name: str
+
+
+def test_prompt_template_mixin():
+    """Test prompt template mixin with dataclass."""
+    assert HelloName("Bob").to_prompt() == "Hello, Bob!"
+    assert HelloName.from_prompt("Hello, John!") == HelloName("John")

@@ -1,42 +1,48 @@
 from dataclasses import dataclass
+from typing import ClassVar
 
 import parse
 
 
+@dataclass
+class PromptTemplateMixin:
+    """
+    Provides
+    """
+
+    prompt_template: ClassVar[str]
+
+    def to_prompt(self) -> str:
+        """
+        Returns a prompt string with the given arguments.
+        """
+        return self.__class__.prompt_template.format(**vars(self))
+
+    @classmethod
+    def from_prompt(cls, text: str):
+        result = parse.parse(cls.prompt_template, text)
+        if result is None:
+            raise ValueError(f"Could not parse prompt {text}")
+        assert len(result.fixed) == 0
+        assert set(result.named.keys()) == set(cls.__dataclass_fields__.keys()) - {"prompt_template"}  # type: ignore
+        prompt_instance = cls(**result.named)  # type: ignore
+        return prompt_instance
+
+
 def prompt_template(prompt_template: str, as_dataclass=True):
     """
-    Wraps
+    Wraps a class to make it a prompt template.
     """
 
     def prompt_wrapper(class_definition):
-        def to_prompt(self, *args, **kwargs) -> str:
-            """
-            Returns a prompt string with the given arguments.
-            """
-            return self.__class__.prompt_template.format(*args, **kwargs, **vars(self))
-
-        @classmethod
-        def from_prompt(clazz, text: str):
-            result = parse.parse(clazz.prompt_template, text)
-            if result is None:
-                raise ValueError(f"Could not parse prompt {text}")
-            # TODO: Handle positional arguments (to to_prompt)
-            # (WANT: If the result has fixed-position values from the string (e.g. {0} or {1}),
-            # then we return them separately.)
-            assert len(result.fixed) == 0
-            prompt_instance = clazz(**result.named)
-            return prompt_instance
-
         if as_dataclass:
             class_definition = dataclass(class_definition)
 
         new_type = type(
             class_definition.__name__,
-            (class_definition,),
-            dict(to_prompt=to_prompt, from_prompt=from_prompt),
+            (class_definition, PromptTemplateMixin),
+            {"prompt_template": prompt_template},
         )
-        new_type.prompt_template = prompt_template
-
         return new_type
 
     return prompt_wrapper
