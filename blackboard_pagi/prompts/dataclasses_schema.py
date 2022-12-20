@@ -177,9 +177,11 @@ class DataclassesSchema:
         *,
         add_subclasses: bool = True,
     ):
-        """Convert a dataclass to a schema, which is a list of type definitions.
+        """Add a dataclass type to the schema.
 
-        Recursively convert nested dataclasses.
+        Recursively convert nested dataclasses and other complex types.
+
+        This only uses static type information.
 
         Args:
             dataclass_type: The dataclass type to convert.
@@ -232,9 +234,11 @@ class DataclassesSchema:
                 self.add_dataclass_type(subclass, add_subclasses=True)
 
     def add_dataclass(self, dataclass_instance: T, *, add_subclasses=False):
-        """Convert a dataclass to a schema, which is a list of type definitions and values.
+        """Add a dataclass to the schema.
 
-        Recursively convert nested dataclasses.
+        Recursively add nested dataclasses and other complex types.
+
+        This uses both static and runtime type information.
 
         Args:
             dataclass_instance: The dataclass type to convert.
@@ -281,7 +285,7 @@ class DataclassesSchema:
 
     def add_return_annotation(self, signature: inspect.Signature, *, add_subclasses=True):
         """
-        Get the return schema from a function signature.
+        Add the return annotation to the schema.
 
         Args:
             signature: The signature to get the return annota.
@@ -292,7 +296,7 @@ class DataclassesSchema:
         Example:
             >>> def foo(a: int, b: str) -> int:
             ...     pass
-            >>> get_return_schema_from_signature(inspect.signature(foo))
+            >>> schema = DataclassesSchema(); schema.add_return_annotation(inspect.signature(foo)); schema.definitions
             {}
         """
         assert signature.return_annotation != inspect.Signature.empty, "Return annotation is required."
@@ -300,6 +304,41 @@ class DataclassesSchema:
             signature.return_annotation
         ), f"Unsupported return type {signature.return_annotation}!"
         self.add_complex_type(signature.return_annotation, add_subclasses=add_subclasses)
+
+    def add_signature(self, signature: inspect.Signature, *, add_subclasses=True):
+        """
+        Add the signature to the schema.
+
+        This only adds complex types using static type information.
+
+        Args:
+            signature: a function signature.
+
+        Returns:
+            The schema.
+
+        Example:
+            >>> def foo(a: int, b: str) -> int:
+            ...     pass
+
+            >>> schema = DataclassesSchema()
+            >>> schema.add_signature(inspect.signature(foo))
+            >>> schema.definitions
+            {}
+
+            >>> @dataclass
+            ... class Foo:
+            ...     a: int
+            ...     b: str
+            >>> schema = DataclassesSchema()
+            >>> schema.add_signature(inspect.signature(foo))
+            >>> schema.definitions
+            {'Foo': {'a': {'type': 'int'}, 'b': {'type': 'str'}}}
+        """
+        for parameter in signature.parameters.values():
+            if parameter.annotation != inspect.Parameter.empty:
+                self.add_complex_type(parameter.annotation, add_subclasses=add_subclasses)
+        self.add_return_annotation(signature, add_subclasses=add_subclasses)
 
     def add_bound_arguments(
         self,

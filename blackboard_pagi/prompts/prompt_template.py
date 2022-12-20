@@ -1,16 +1,25 @@
+import typing
 from dataclasses import dataclass
 from typing import ClassVar, TypeVar
 
+import langchain.llms
 import parse
+import typing_extensions
 from typing_extensions import dataclass_transform
 
 T = TypeVar("T")
 
 
 @dataclass
+class PromptResult(typing.Generic[T]):
+    prompt: T
+    response: str
+
+
+@dataclass
 class PromptTemplateMixin:
     """
-    Provides
+    A template for the prompt.
     """
 
     prompt_template: ClassVar[str]
@@ -31,8 +40,9 @@ class PromptTemplateMixin:
         prompt_instance = cls(**result.named)  # type: ignore
         return prompt_instance
 
-    def __call__(self) -> str:
-        return self.render()
+    def __call__(self, lmm: langchain.llms.LLM) -> PromptResult[typing_extensions.Self]:  # type: ignore
+        response_text = lmm(self.render())
+        return PromptResult(prompt=self, response=response_text)
 
 
 def prompt_template(prompt_template: str, as_dataclass=True):
