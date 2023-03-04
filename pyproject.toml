@@ -49,11 +49,11 @@ toml = {version = "^0.10.2", optional = true}
 bump2version = {version = "^1.0.1", optional = true}
 jinja2 = {version = "<3.1.0", optional = false}
 blackhc-project = "^2.6.0"
-langchain = {extras = ["all"], version = "^0.0.38"}
+langchain = {version = "^0.0.100"}
 ipykernel = {version = "^6.19.2", optional = true}
 gitpython = "^3.1.29"
 pip = "^22.3.1"
-openai = "^0.25.0"
+openai = "^0.27.0"
 manifest-ml = "^0.0.1"
 python-frontmatter = "^1.0.0"
 matplotlib = "^3.6.2"
