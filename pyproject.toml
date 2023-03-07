@@ -61,6 +61,7 @@ pillow = "^9.3.0"
 parse = {version = "^1.19.0"}
 docstring-parser = "^0.15"
 dacite = "^1.6.0"
+jax = {version = "^0.4.5", extras = ["cpu"]}
 
 [tool.poetry.extras]
 test = [
