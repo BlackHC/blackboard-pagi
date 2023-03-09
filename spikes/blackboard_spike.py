@@ -10,7 +10,8 @@ from langchain.chat_models import ChatOpenAI
 from langchain.llms import BaseLLM
 from langchain.schema import AIMessage, BaseMessage, ChatGeneration, ChatResult, Generation, HumanMessage, SystemMessage
 
-from blackboard_pagi.prompts.chat_chain import BooleanClarification, BooleanDecision, ChatChain
+from blackboard_pagi.prompts.chat_chain import BooleanDecision, ChatChain
+from blackboard_pagi.prompts.structured_converters import BooleanConverter
 
 
 @dataclass
@@ -46,32 +47,11 @@ class Contribution:
 
 
 @dataclass
-class OracleChain:
-    """A chain of messages that is used to ask an oracle a question"""
-
-    chat_model: ChatOpenAI
-    chat_chain: ChatChain
-
-    @property
-    def response(self):
-        return self.chat_chain.response
-
-    def query(self, question: str) -> Tuple[str, "OracleChain"]:
-        """Asks a question and returns the result in a single block."""
-        reply, chain = self.chat_chain.query(self.chat_model, question)
-        return reply, OracleChain(self.chat_model, chain)
-
-    def branch(self) -> "OracleChain":
-        """Branches the chain"""
-        return OracleChain(self.chat_model, self.chat_chain.branch())
-
-
-@dataclass
 class Oracle:
     chat_model: ChatOpenAI
     text_model: BaseLLM
 
-    def start_oracle_chain(self, context: str) -> OracleChain:
+    def start_oracle_chain(self, context: str) -> ChatChain:
         """Starts an oracle chain with the given context"""
         # Build messages:
         messages = [
@@ -88,7 +68,7 @@ class Oracle:
             # TODO: we might want to add a prompt here to make sure the oracle understands the context.
             AIMessage(content="Ok, I understand the context. What is your question?"),
         ]
-        return OracleChain(self.chat_model, ChatChain(messages))
+        return ChatChain(self.chat_model, messages)
 
 
 @dataclass
@@ -178,12 +158,12 @@ class Controller:
         how_response, chain = chain.query("How could we solve the goal using all the available information?")
         does_response, chain = chain.query("Does this solve the goal or provide a definite answer?")
 
-        boolean_clarification = BooleanClarification()
+        boolean_clarification = BooleanConverter()
         does_response_clarification, _ = chain.query(boolean_clarification.query)
-        can_convert = boolean_clarification.can_convert(does_response_clarification)
-        if not can_convert:
+
+        does_response = boolean_clarification.try_convert(does_response_clarification)
+        if does_response.is_missing():
             raise NotImplementedError("We don't know how to handle this yet.")
-        does_response = boolean_clarification.convert(does_response_clarification)
 
         if does_response:
             what_response, chain = chain.query("Hence, what is the solution?")
