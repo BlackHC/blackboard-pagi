@@ -46,7 +46,7 @@ toml = {version = "^0.10.2", optional = true}
 bump2version = {version = "^1.0.1", optional = true}
 jinja2 = {version = "<3.1.0", optional = false}
 blackhc-project = "^2.6.0"
-langchain = {version = "^0.0.104"}
+langchain = {version = "^0.0.126"}
 ipykernel = {version = "^6.19.2", optional = true}
 gitpython = "^3.1.29"
 pip = "^22.3.1"

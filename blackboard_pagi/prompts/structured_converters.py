@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from typing import ClassVar, Generic, TypeVar
+from typing import ClassVar, Generic, Tuple, TypeGuard, TypeVar
+
+from langchain.llms import BaseLLM
 
 from blackboard_pagi.prompts.chat_chain import ChatChain
 
@@ -12,7 +14,7 @@ class LLMOptional:
     A class to represent a potentially parsed value.
     """
 
-    def is_missing(self):
+    def is_missing(self) -> TypeGuard["LLMNone"]:
         raise NotImplementedError()
 
 
@@ -25,8 +27,10 @@ class LLMValue(LLMOptional, Generic[T]):
     value: T
     source: str
 
+    # this is a type check essentially -- how do we tell the type checker?
+
     def is_missing(self):
-        raise False
+        return False
 
 
 @dataclass
@@ -53,19 +57,38 @@ class LLMBool(LLMValue[bool]):
 
 V = TypeVar("V", bound=LLMOptional)
 
+L = TypeVar("L", bound=LLMValue)
 
-class StructuredConverter(Generic[T]):
+
+@dataclass
+class StructuredConverter(Generic[L]):
     query: ClassVar[str]
     """Follow-up query to use in prompt if the conversion fails."""
+    examples: ClassVar[list[Tuple[str, str]]]
+    """Examples to use in prompt with the fallback LLM if the direct conversion fails."""
 
-    def __call__(self, response: str) -> LLMValue[T] | LLMNone:
+    conversion_llm: BaseLLM | None = None
+    """LLM to use for conversion (we usually try the chat model first though)."""
+
+    def __call__(self, response: str) -> L | LLMNone:
         raise NotImplementedError()
 
-    def convert_from_chain_response(self, chat_chain: "ChatChain") -> LLMValue[T] | LLMNone:
+    def convert_from_chain(self, chat_chain: "ChatChain") -> L | LLMNone:
         """
-        Converts a chat chain to a value using the given converter.
+        Converts a chat chain's last response to a value using the given converter.
         """
         result = self(chat_chain.response)
+        if not result.is_missing():
+            return result
+
+        query_prompt = (
+            self.query
+            + "\n\nExamples:\n"
+            + "\n".join(f"INPUT:\n{example[0]}\n\nOUTPUT:\n{example[1]}\n" for example in self.examples)
+        )
+
+        query_response, chat_chain = chat_chain.query(query_prompt)
+        result = self(query_response)
         if not result.is_missing():
             return result
 
@@ -80,32 +103,109 @@ class StructuredConverter(Generic[T]):
             if not result.is_missing():
                 return result
 
+        if self.conversion_llm is not None:
+            return self.convert_via_llm(query_response)
+
+        return result
+
+    def convert_via_llm(self, text: str) -> L | LLMNone:
+        """
+        Converts a text to a value using the given converter and conversion LLM.
+        """
+        assert self.conversion_llm is not None
+
+        result = self(text)
+        if not result.is_missing():
+            return result
+
+        # Build prompt for conversion LLM
+        prompt = (
+            f"{self.query}\n"
+            "\n"
+            "Examples:\n"
+            "\n" + "\n".join(f"INPUT:\n{example[0]}\n\nOUTPUT:\n{example[1]}\n" for example in self.examples) + "\n"
+            "INPUT:\n"
+            f"{text}\n"
+            "\n"
+            "OUTPUT:\n"
+        )
+
+        result_text = self.conversion_llm(prompt, stop=["INPUT:"])
+        result = self(result_text)
+
+        if not result.is_missing():
+            return result
+
+        for _ in range(2):
+            assert isinstance(result, LLMNone)
+
+            retry_prompt = prompt + (
+                "\n---\n"
+                "I couldn't parse the last output and I failed.\n"
+                "Error:\n"
+                f"{result.details}\n"
+                "\n"
+                f"{self.query}\n"
+                "Try again:\n"
+                "---\n"
+                "OUTPUT:\n"
+            )
+            result_text = self.conversion_llm(retry_prompt, stop=["INPUT:"])
+            result = self(result_text)
+            if not result.is_missing():
+                return result
+
         return result
 
 
-class BooleanConverter(StructuredConverter):
+class BooleanConverter(StructuredConverter[LLMBool]):
     query: ClassVar[str] = """Does this mean yes or no? Please answer with either 'yes' or 'no' as your full answer."""
+    examples = [("Yes, indeed.", "Yes"), ("No, not at all.", "No"), ("Positive. The statement is true.", "Yes")]
     no_synonyms: ClassVar[set[str]] = {"no", "false", "0"}
     yes_synonyms: ClassVar[set[str]] = {"yes", "true", "1"}
 
     @classmethod
-    def __call__(cls, response: str) -> LLMBool | ConversionFailure:
+    def __call__(cls, response: str) -> LLMBool | LLMNone:
         reduced_response = response.lower().strip().rstrip('.')
         if reduced_response in cls.no_synonyms | cls.yes_synonyms:
             return LLMBool(any(synonym in response.lower() for synonym in cls.yes_synonyms), response)
         else:
-            return ConversionFailure(
+            return LLMNone(
                 f"Expected response in `{cls.no_synonyms}`"
                 " | `{self.yes_synonyms}`, "
                 f"but got `{reduced_response}`!"
             )
 
+    def convert_from_chain(self, chat_chain: "ChatChain") -> LLMBool | LLMNone:
+        return super().convert_from_chain(chat_chain)
 
-class StringConverter(StructuredConverter):
+
+class StringConverter(StructuredConverter[LLMValue[str]]):
     query: ClassVar[str] = "Please repeat only the relevant answer as an string wrapped in '\"' as your full answer."
+    examples = [("The answer is \"42\".", "\"42\""), ("The answer is \"Hello\\\nWorld!\".", "\"Hello\\nWorld!\"")]
 
-    def __call__(self, response: str) -> LLMValue[str] | ConversionFailure:
+    def __call__(self, response: str) -> LLMValue[str] | LLMNone:
         if response.strip().startswith('"') and response.strip().endswith('"'):
             return LLMValue(response.strip()[1:-1], response)
         else:
-            return ConversionFailure(f"Expected response to be wrapped in \"\" but got `{response.strip()}`!")
+            return LLMNone(f"Expected response to be wrapped in \"\" but got `{response.strip()}`!")
+
+
+class ProbabilityConverter(StructuredConverter[LLMValue[float]]):
+    query: ClassVar[
+        str
+    ] = "Please repeat only the relevant probability as a number between 0 and 1 as your full answer."
+    examples = [("The probability is 0.42.", "0.42"), ("The probability is 0.5.", "0.5")]
+
+    def __call__(self, response: str) -> LLMValue[float] | LLMNone:
+        # parse the response as a float
+        try:
+            probability = float(response.strip())
+        except ValueError:
+            return LLMNone(f"Expected response to be a number but got `{response.strip()}`!")
+
+        # check that the probability is between 0 and 1
+        if 0 <= probability <= 1:
+            return LLMValue(probability, response)
+        else:
+            return LLMNone(f"Expected response to be between 0 and 1 but got `{response.strip()}`!")

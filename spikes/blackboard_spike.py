@@ -4,14 +4,20 @@
 """Blackboard (AI) Pattern Spike"""
 import dataclasses
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Tuple
 
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import BaseLLM
-from langchain.schema import AIMessage, BaseMessage, ChatGeneration, ChatResult, Generation, HumanMessage, SystemMessage
+from langchain.schema import AIMessage, HumanMessage, SystemMessage
 
-from blackboard_pagi.prompts.chat_chain import BooleanDecision, ChatChain
-from blackboard_pagi.prompts.structured_converters import BooleanConverter
+from blackboard_pagi.cached_chat_model import CachedChatOpenAI
+from blackboard_pagi.prompts.chat_chain import ChatChain
+from blackboard_pagi.prompts.structured_converters import (
+    BooleanConverter,
+    LLMBool,
+    ProbabilityConverter,
+    StringConverter,
+)
 
 
 @dataclass
@@ -24,7 +30,8 @@ class Contribution:
     origin: str
     content: str
     feedback: str
-    confidence: str
+    confidence: float
+    confidence_full: str
     dependencies: list["Contribution"]
 
     def to_prompt_context(self):
@@ -43,6 +50,8 @@ class Contribution:
             f"### Feedback\n"
             f"{self.feedback}\n"
             "\n"
+            f"### Self-Evaluation\n"
+            f"{self.confidence_full}\n"
         )
 
 
@@ -87,7 +96,7 @@ class Blackboard:
 
         context = f"# Goal\n{self.goal}\n\n"
         if self.contributions:
-            context += "# Contributions\n" "\n".join(
+            context += "# Contributions\n" + "\n".join(
                 [contribution.to_prompt_context() for contribution in self.contributions]
             )
         return context
@@ -133,7 +142,7 @@ class Controller:
     blackboard: Blackboard
     oracle: Oracle
     knowledge_sources: list[KnowledgeSource]
-    last_reported_success: BooleanDecision | None = None
+    last_reported_success: LLMBool | None = None
 
     def update(self):
         """
@@ -145,23 +154,27 @@ class Controller:
 
         reported_success, solution_attempt = self.try_solve()
 
-        self.blackboard.contributions.append(solution_attempt)
+        # self.blackboard.contributions.append(solution_attempt)
+        self.blackboard.contributions = [solution_attempt]
         self.last_reported_success = reported_success
 
         return reported_success
 
-    def try_solve(self) -> Tuple[BooleanDecision, Contribution]:
+    def try_solve(self) -> Tuple[LLMBool, Contribution]:
         """
         Returns a contribution to the blackboard
         """
         chain = self.oracle.start_oracle_chain(self.blackboard.to_prompt_context())
-        how_response, chain = chain.query("How could we solve the goal using all the available information?")
+        how_response, chain = chain.query(
+            "How could we solve the goal using the available information I've provided above? "
+            "Avoid repeating yourself and refer to previous sections when possible instead by using [[#Section]]."
+        )
         does_response, chain = chain.query("Does this solve the goal or provide a definite answer?")
 
         boolean_clarification = BooleanConverter()
-        does_response_clarification, _ = chain.query(boolean_clarification.query)
+        _, does_response_chain = chain.query(boolean_clarification.query)
 
-        does_response = boolean_clarification.try_convert(does_response_clarification)
+        does_response = boolean_clarification.convert_from_chain(does_response_chain)
         if does_response.is_missing():
             raise NotImplementedError("We don't know how to handle this yet.")
 
@@ -172,10 +185,16 @@ class Controller:
         feedback_response, chain = chain.query(
             "How could your response be improved? Is anything missing? Does anything look wrong in hindsight?"
         )
-        confidence_response, chain = chain.query(
-            "Given all this, how confident are you about your original reponse? Is it likely correct/consistent?"
+        confidence_response, confidence_chain = chain.query(
+            "Given all this, how confident are you about your original response? Is it likely correct/consistent?"
             "Please self-report a confidence level: 0.0 = no confidence, 1.0 = full confidence."
         )
+
+        probability_converter = ProbabilityConverter()
+        confidence_value = probability_converter.convert_from_chain(confidence_chain)
+        if confidence_value.is_missing():
+            raise NotImplementedError("We don't know how to handle this yet.")
+        confidence_value = confidence_value.value
 
         name_query = "Please come up with a name for your original response."
         if self.blackboard.contributions:
@@ -183,26 +202,34 @@ class Controller:
                 "Make it unique. It should be different than existing subsections under 'Contributions'",
                 [contribution.name for contribution in self.blackboard.contributions],
             )
-        name, _ = chain.query(name_query)
 
-        if self.blackboard.contributions:
-            dependencies_query = "Please provide the subsection titles this solution directly depends on. "
-            dependencies_query += optionally_include_enumeration(
-                "(The following subsections exist under 'Contributions'",
-                [contribution.name for contribution in self.blackboard.contributions],
-                ")",
-            )
-            dependencies, _ = chain.query(dependencies_query)
-        else:
-            dependencies = []
+        _, name_chain = chain.query(name_query)
+
+        string_converter = StringConverter()
+        name = string_converter.convert_from_chain(name_chain)
+        if name.is_missing():
+            raise NotImplementedError("We don't know how to handle this yet.")
+        name = name.value
+
+        # if self.blackboard.contributions:
+        #     dependencies_query = "Please provide the subsection titles this solution directly depends on. "
+        #     dependencies_query += optionally_include_enumeration(
+        #         "(The following subsections exist under 'Contributions'",
+        #         [contribution.name for contribution in self.blackboard.contributions],
+        #         ")",
+        #     )
+        #     dependencies, _ = chain.query(dependencies_query)
+        # else:
+        #     dependencies = []
 
         return does_response, Contribution(
             name=name,
             origin="Oracle",
             content=how_response,
             feedback=feedback_response,
-            confidence=confidence_response,
-            dependencies=[dependencies],
+            confidence=confidence_value,
+            confidence_full=confidence_response,
+            dependencies=[],
         )
 
 
@@ -213,35 +240,15 @@ from langchain.cache import SQLiteCache
 
 langchain.llm_cache = SQLiteCache(".chat.langchain.db")
 
-
-class CachedChatOpenAI(ChatOpenAI):
-    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None) -> ChatResult:
-        messages_prompt = repr(messages)
-        if langchain.llm_cache:
-            results = langchain.llm_cache.lookup(messages_prompt, self.model_name)
-            if results:
-                assert len(results) == 1
-                result: Generation = results[0]
-                chat_result = ChatResult(
-                    generations=[ChatGeneration(message=AIMessage(content=result.text))],
-                    llm_output=result.generation_info,
-                )
-                return chat_result
-        chat_result = super()._generate(messages, stop)
-        if langchain.llm_cache:
-            assert len(chat_result.generations) == 1
-            result = Generation(text=chat_result.generations[0].message.content, generation_info=chat_result.llm_output)
-            langchain.llm_cache.update(messages_prompt, self.model_name, [result])
-        return chat_result
-
-
-chat_model = CachedChatOpenAI(max_tokens=512, model_kwargs=dict(temperature=0.0))
+chat_model = CachedChatOpenAI(max_tokens=512)
 
 text_model = OpenAI(model_name="text-davinci-001", max_tokens=256, model_kwargs=dict(temperature=0.0))
 
-blackboard = Blackboard("How can we solve the problem of global warming?")
+blackboard = Blackboard("Answer the question: what's the proof that the square root of 2 is irrational?")
 oracle = Oracle(chat_model, text_model)
 controller = Controller(blackboard, oracle, [])
 
 #%%
-controller.update()
+for i in range(10):
+    print(i, controller.update())
+    print(blackboard.to_prompt_context())

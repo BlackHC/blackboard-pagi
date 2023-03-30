@@ -8,8 +8,8 @@ from langchain.schema import BaseMessage, HumanMessage
 
 @dataclass
 class ChatChain:
-    messages: list[BaseMessage]
     chat_model: ChatOpenAI
+    messages: list[BaseMessage]
 
     @property
     def response(self):
