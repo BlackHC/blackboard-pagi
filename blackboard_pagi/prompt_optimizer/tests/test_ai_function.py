@@ -12,7 +12,7 @@ from blackboard_pagi.prompt_optimizer.ai_function import (
     is_not_implemented,
     update_json_schema_hyperparameters,
 )
-from blackboard_pagi.prompts.chat_chain import ChatChain
+from blackboard_pagi.prompt_optimizer.track_execution import ChatChain
 from blackboard_pagi.testing.fake_llm import FakeLLM
 
 

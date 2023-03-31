@@ -1,5 +1,7 @@
+import re
+
 import pytest
-from langchain.schema import AIMessage, HumanMessage
+from langchain.schema import AIMessage, HumanMessage, OutputParserException
 
 from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
 from blackboard_pagi.testing.fake_chat_model import FakeChatModel
@@ -12,7 +14,7 @@ def test_no_description():
 
     assert f() == 1
 
-    f.hyperparameters[f.__qualname__][0] = 2
+    f.all_hyperparameters[f.__qualname__][0] = 2
     assert f() == 2
 
     @track_execution
@@ -21,7 +23,7 @@ def test_no_description():
 
     assert g() == "HelloHello"
 
-    g.hyperparameters[g.__qualname__][1] = "World"
+    g.all_hyperparameters[g.__qualname__][1] = "World"
     assert g() == "HelloWorld"
 
 
@@ -32,7 +34,7 @@ def test_with_description():
 
     assert f() == 1
 
-    f.hyperparameters[f.__qualname__]["Hello"] = 2
+    f.all_hyperparameters[f.__qualname__]["Hello"] = 2
     assert f() == 2
 
     @track_execution
@@ -41,7 +43,7 @@ def test_with_description():
 
     assert g() == "HelloHello"
 
-    g.hyperparameters[g.__qualname__]["Hello"] = "World"
+    g.all_hyperparameters[g.__qualname__]["Hello"] = "World"
     assert g() == "WorldWorld"
 
 
@@ -58,11 +60,11 @@ def test_nested():
 
     assert g() == 6
 
-    g.hyperparameters[g.__qualname__]["Hello"] = 4
+    g.all_hyperparameters[g.__qualname__]["Hello"] = 4
 
     assert g() == 7
 
-    g.hyperparameters[f.__qualname__]["Hello"] = 5
+    g.all_hyperparameters[f.__qualname__]["Hello"] = 5
 
     assert g() == 11
 
@@ -226,3 +228,106 @@ def test_chat_chain():
             'messages': [{'content': 'Hello', 'role': 'user'}, {'content': 'World', 'role': 'assistant'}],
         }
     ]
+
+
+def test_chat_chain_structured_query():
+    chat_model = FakeChatModel.from_messages(
+        [
+            [
+                HumanMessage(
+                    content='Return 1 as string\n\nThe output should be formatted as a JSON instance that conforms to '
+                    'the JSON schema below.\n\nAs an example, for the schema {"properties": {"foo": {"title": '
+                    '"Foo", "description": "a list of strings", "type": "array", "items": {"type": '
+                    '"string"}}}, "required": ["foo"]}}\nthe object {"foo": ["bar", "baz"]} is a '
+                    'well-formatted instance of the schema. The object {"properties": {"foo": ["bar", '
+                    '"baz"]}} is not well-formatted.\n\nHere is the output schema:\n```\n{"properties": {'
+                    '"result": {"title": "Result", "type": "string"}}, "required": ["result"]}\n```',
+                    additional_kwargs={},
+                ),
+                AIMessage(content='{"result": "1"}', additional_kwargs={}),
+            ]
+        ]
+    )
+
+    @track_execution
+    def f():
+        chain = ChatChain(chat_model, [])
+        result, new_chain = chain.structured_query("Return 1 as string", str)
+        assert result == "1"
+        assert len(new_chain.get_full_message_chain()) == 2
+
+    f()
+
+
+def test_chat_chain_structured_query_retry():
+    chat_model = FakeChatModel.from_messages(
+        [
+            [
+                HumanMessage(
+                    content='Return 1 as string\n\nThe output should be formatted as a JSON instance that conforms to '
+                    'the JSON schema below.\n\nAs an example, for the schema {"properties": {"foo": {"title": '
+                    '"Foo", "description": "a list of strings", "type": "array", "items": {"type": '
+                    '"string"}}}, "required": ["foo"]}}\nthe object {"foo": ["bar", "baz"]} is a '
+                    'well-formatted instance of the schema. The object {"properties": {"foo": ["bar", '
+                    '"baz"]}} is not well-formatted.\n\nHere is the output schema:\n```\n{"properties": {'
+                    '"result": {"title": "Result", "type": "string"}}, "required": ["result"]}\n```',
+                    additional_kwargs={},
+                ),
+                AIMessage(content='The result is: "1".', additional_kwargs={}),
+                HumanMessage(
+                    content='Tried to parse your last output but failed:\n\nFailed to parse StructuredOutput from '
+                    'completion The result is: "1".. Got: Expecting value: line 1 column 1 (char 0)\n\nPlease '
+                    'try again and avoid this issue.',
+                    additional_kwargs={},
+                ),
+                AIMessage(content='My apologies. The result should be: {"result": "1"}', additional_kwargs={}),
+            ]
+        ]
+    )
+
+    @track_execution
+    def f():
+        chain = ChatChain(chat_model, [])
+        result, new_chain = chain.structured_query("Return 1 as string", str)
+        assert result == "1"
+        assert len(new_chain.get_full_message_chain()) == 4
+
+    f()
+
+
+def test_chat_chain_structured_query_retry_fail():
+    chat_model = FakeChatModel.from_messages(
+        [
+            [
+                HumanMessage(
+                    content='Return 1 as string\n\nThe output should be formatted as a JSON instance that conforms to '
+                    'the JSON schema below.\n\nAs an example, for the schema {"properties": {"foo": {"title": '
+                    '"Foo", "description": "a list of strings", "type": "array", "items": {"type": '
+                    '"string"}}}, "required": ["foo"]}}\nthe object {"foo": ["bar", "baz"]} is a '
+                    'well-formatted instance of the schema. The object {"properties": {"foo": ["bar", '
+                    '"baz"]}} is not well-formatted.\n\nHere is the output schema:\n```\n{"properties": {'
+                    '"result": {"title": "Result", "type": "string"}}, "required": ["result"]}\n```',
+                    additional_kwargs={},
+                ),
+                AIMessage(content='The result is: "1".', additional_kwargs={}),
+                HumanMessage(
+                    content='Tried to parse your last output but failed:\n\nFailed to parse StructuredOutput from '
+                    'completion The result is: "1".. Got: Expecting value: line 1 column 1 (char 0)\n\nPlease '
+                    'try again and avoid this issue.',
+                    additional_kwargs={},
+                ),
+                AIMessage(content='My apologies. The result should be: {"result": "1"}', additional_kwargs={}),
+            ]
+        ]
+    )
+
+    @track_execution
+    def f():
+        chain = ChatChain(chat_model, [])
+        result, new_chain = chain.structured_query("Return 1 as string", str)
+        assert result == "1"
+        assert len(new_chain.get_full_message_chain()) == 4
+
+    ChatChain.structured_query.hyperparameters['num_retries'] = 0
+    with pytest.raises(OutputParserException, match=re.escape("Failed to parse output")):
+        f()

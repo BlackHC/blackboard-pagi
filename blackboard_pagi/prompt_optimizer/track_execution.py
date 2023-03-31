@@ -117,7 +117,8 @@ class WrappedChatModelAsLLM(BaseLLM):
 
 
 class ProtocolCallableWPromptHyperparams(typing.Protocol):
-    hyperparameters: dict[str, dict[str | int, object]]
+    hyperparameters: dict[str | int, object]
+    all_hyperparameters: dict[str, dict[str | int, object]]
     tracked_chat_chains: list[dict]
     all_chat_chains: list[dict]
     tracked_prompts: dict[str, str]
@@ -134,13 +135,14 @@ def track_execution(f) -> ProtocolCallableWPromptHyperparams:
         old_tracker_state = current_tracked_state
 
         try:
+            decorator.all_hyperparameters[decorator.__qualname__] = decorator.hyperparameters
             current_tracked_state = TrackedState(
-                hyperparameters=decorator.hyperparameters.setdefault(decorator.__qualname__, {}),
-                all_hyperparameters=decorator.hyperparameters,
+                hyperparameters=decorator.hyperparameters,
+                all_hyperparameters=decorator.all_hyperparameters,
             )
             result = f(*args, **kwargs)
-            if decorator.hyperparameters[decorator.__qualname__] == {}:
-                del decorator.hyperparameters[decorator.__qualname__]
+            if decorator.all_hyperparameters[decorator.__qualname__] == {}:
+                del decorator.all_hyperparameters[decorator.__qualname__]
             if old_tracker_state is not None:
                 old_tracker_state.all_hyperparameters.update(current_tracked_state.all_hyperparameters)
             else:
@@ -156,7 +158,7 @@ def track_execution(f) -> ProtocolCallableWPromptHyperparams:
                 decorator.tracked_prompts = current_tracked_state.tracked_prompts
                 decorator.all_prompts = current_tracked_state.all_prompts
 
-            decorator.hyperparameters = current_tracked_state.all_hyperparameters
+            decorator.all_hyperparameters = current_tracked_state.all_hyperparameters
         finally:
             current_tracked_state = old_tracker_state
 
@@ -164,6 +166,7 @@ def track_execution(f) -> ProtocolCallableWPromptHyperparams:
 
     # ignore attr-defined from mypy
     decorator.hyperparameters = {}  # type: ignore
+    decorator.all_hyperparameters = {decorator.__qualname__: decorator.hyperparameters}  # type: ignore
     decorator.all_chat_chains = []  # type: ignore
     decorator.tracked_chat_chains = []  # type: ignore
     decorator.tracked_prompts = {}  # type: ignore
@@ -255,7 +258,8 @@ class ChatChain(chat_chain.ChatChain):
         else:
             raise OutputParserException(f"Failed to parse output after {num_retries} retries.")
 
-        return parsed_reply, chain
+        result = parsed_reply.result  # type: ignore
+        return result, chain
 
     def branch(self) -> "ChatChain":
         new_chain = dataclasses.replace(self, messages=[], parent=self, children=[])
