@@ -43,7 +43,6 @@ class FakeLLM(LLM, BaseModel):
 
     def _call(self, prompt: str, stop: list[str] | None = None) -> str:
         """Return the query if it exists, else print the code to update the query."""
-        print(self.texts)
         for text in self.texts:
             if text.startswith(prompt):
                 # Remainder:
@@ -64,9 +63,11 @@ class FakeLLM(LLM, BaseModel):
             return response
 
         # If no queries are provided, print the code to update the query
-        code_snippet = f"""# Add the following to the queries dict:
-{prompt!r}, # TODO: Append the correct response here
-"""
+        code_snippet = (
+            "# Add the following to the queries dict:\n\n"
+            + "\n".join(map(repr, prompt.splitlines(True)))
+            + "\n# TODO: Append the correct response here"
+        )
         raise NotImplementedError("No query provided. Add the following to the queries dict:\n\n" + code_snippet)
 
     @property
