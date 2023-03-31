@@ -71,11 +71,20 @@ class StructuredConverter(Generic[L]):
     def __call__(self, response: str) -> L | LLMNone:
         raise NotImplementedError()
 
+    @staticmethod
+    def strip_explanation(response):
+        """
+        Strips the explanation from a response.
+        """
+        if "## Explanation" in response:
+            return response.split("## Explanation")[0].strip()
+        return response
+
     def convert_from_chain(self, chat_chain: "ChatChain") -> L | LLMNone:
         """
         Converts a chat chain's last response to a value using the given converter.
         """
-        result = self(chat_chain.response)
+        result = self(self.strip_explanation(chat_chain.response))
         if not result.is_missing():
             return result
 
@@ -86,7 +95,7 @@ class StructuredConverter(Generic[L]):
         )
 
         query_response, chat_chain = chat_chain.query(query_prompt)
-        result = self(query_response)
+        result = self(self.strip_explanation(query_response))
         if not result.is_missing():
             return result
 
@@ -94,10 +103,12 @@ class StructuredConverter(Generic[L]):
             assert isinstance(result, LLMNone)
 
             retry_prompt = (
-                f"""I'm sorry, I'm parsing your output and I failed. Error:\n{result.details}\n\n{self.query}"""
+                "I've failed at parsing your last answer. It did not follow the specification. Error:\n"
+                f"{result.details}\n\n{self.query}.\n"
+                "Do not apologize. Just follow instructions."
             )
             response, chat_chain = chat_chain.query(retry_prompt)
-            result = self(response)
+            result = self(self.strip_explanation(response))
             if not result.is_missing():
                 return result
 
@@ -168,42 +179,56 @@ class BooleanConverter(StructuredConverter[LLMBool]):
         if reduced_response in cls.no_synonyms | cls.yes_synonyms:
             return LLMBool(any(synonym in response.lower() for synonym in cls.yes_synonyms), response)
         else:
-            return LLMNone(
-                f"Expected response in `{cls.no_synonyms}`"
-                " | `{self.yes_synonyms}`, "
-                f"but got `{reduced_response}`!"
-            )
+            return LLMNone(f"Expected response in `{cls.no_synonyms}`" " | `{self.yes_synonyms}`!")
 
     def convert_from_chain(self, chat_chain: "ChatChain") -> LLMBool | LLMNone:
         return super().convert_from_chain(chat_chain)
 
 
 class StringConverter(StructuredConverter[LLMValue[str]]):
-    query: ClassVar[str] = "Please repeat only the relevant answer as an string wrapped in '\"' as your full answer."
-    examples = [("The answer is \"42\".", "\"42\""), ("The answer is \"Hello\\\nWorld!\".", "\"Hello\\nWorld!\"")]
+    query: ClassVar[str] = (
+        "Wrapped the relevant part in \"\" at the start, followed by an optional "
+        "explanation using the format '##Explanation\n{your_explanation}'."
+    )
+    examples = [
+        ("The answer is \"42\".", "\"42\n##Explanation\nMy explanation for this can follow here.\""),
+        ("The answer is \"Hello\\\nWorld!\".", "\"Hello\\nWorld!\"\n## Explanation\nMy explanation can follow here."),
+    ]
 
     def __call__(self, response: str) -> LLMValue[str] | LLMNone:
         if response.strip().startswith('"') and response.strip().endswith('"'):
             return LLMValue(response.strip()[1:-1], response)
         else:
-            return LLMNone(f"Expected response to be wrapped in \"\" but got `{response.strip()}`!")
+            return LLMNone(
+                "Expected only the response wrapped in \"\" at the start of your reply, "
+                "followed by an optional explanation in a subsection ## Explanation!"
+            )
 
 
 class ProbabilityConverter(StructuredConverter[LLMValue[float]]):
     query: ClassVar[
         str
     ] = "Please repeat only the relevant probability as a number between 0 and 1 as your full answer."
-    examples = [("The probability is 0.42.", "0.42"), ("The probability is 0.5.", "0.5")]
+    examples = [
+        ("The probability is 0.42.", "0.42\n## Explanation\nMy explanation can follow here."),
+        ("The probability is 0.5.", "0.5\n## Explanation\nMy explanation can follow here."),
+    ]
 
     def __call__(self, response: str) -> LLMValue[float] | LLMNone:
         # parse the response as a float
         try:
             probability = float(response.strip())
         except ValueError:
-            return LLMNone(f"Expected response to be a number but got `{response.strip()}`!")
+            return LLMNone(
+                "Expected response to be a number, followed by "
+                "an optional explanation in a subsection ## Explanation!"
+            )
 
         # check that the probability is between 0 and 1
         if 0 <= probability <= 1:
             return LLMValue(probability, response)
         else:
-            return LLMNone(f"Expected response to be between 0 and 1 but got `{response.strip()}`!")
+            return LLMNone(
+                "Expected response to be between 0 and 1, followed by "
+                "an optional explanation in a subsection ## Explanation!"
+            )

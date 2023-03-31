@@ -126,7 +126,11 @@ class Controller:
         reported_success, solution_attempt = self.try_solve()
 
         # self.blackboard.contributions.append(solution_attempt)
-        self.blackboard.contributions = [solution_attempt]
+        new_contributions = [solution_attempt]
+        if new_contributions == self.blackboard.contributions:
+            # TODO: turn this into a return value
+            raise RuntimeError("No new information---unlikely fixpoint reached.")
+        self.blackboard.contributions = new_contributions
         self.last_reported_success = reported_success
 
         return reported_success
@@ -138,7 +142,7 @@ class Controller:
         chain = self.oracle.start_oracle_chain(self.blackboard.to_prompt_context())
         how_response, chain = chain.query(
             "How could we solve the goal using the available information I've provided above? "
-            "Avoid repeating yourself and refer to previous sections when possible instead by using [[#Section]]."
+            "Avoid repeating yourself and refer to previous sections when possible instead by using wikilinks."
         )
         does_response, chain = chain.query("Does this solve the goal or provide a definite answer?")
 
@@ -167,12 +171,16 @@ class Controller:
             raise NotImplementedError("We don't know how to handle this yet.")
         confidence_value = confidence_value.value
 
-        name_query = "Please come up with a name for your original response."
+        name_query = "Please suggest a title for your response."
         if self.blackboard.contributions:
             name_query += optionally_include_enumeration(
-                "Make it unique. It should be different than existing subsections under 'Contributions'",
+                "Make it unique. It should be different than existing sections under 'Contributions':",
                 [contribution.name for contribution in self.blackboard.contributions],
             )
+        name_query += (
+            "Respond with the title wrapped in \"\" at the start, e.g. \"My Title\"., followed by an optional "
+            "explanation using the format '## Explanation\n{your_explanation}'."
+        )
 
         _, name_chain = chain.query(name_query)
 
@@ -215,11 +223,17 @@ chat_model = CachedChatOpenAI(max_tokens=512)
 
 text_model = OpenAI(model_name="text-davinci-001", max_tokens=256, model_kwargs=dict(temperature=0.0))
 
-blackboard = Blackboard("Answer the question: what's the proof that the square root of 2 is irrational?")
+# blackboard = Blackboard("Answer the question: what's the proof that the square root of 2 is irrational?")
+blackboard = Blackboard(
+    "Write a short essay considering whether AGI non-proliferation is achievable and how it compares to nuclear or autonomous weapon non-proliferation."
+)
 oracle = Oracle(chat_model, text_model)
 controller = Controller(blackboard, oracle, [])
 
 #%%
 for i in range(10):
-    print(i, controller.update())
+    solved = controller.update()
+    print(i, solved)
     print(blackboard.to_prompt_context())
+    if solved:
+        break
