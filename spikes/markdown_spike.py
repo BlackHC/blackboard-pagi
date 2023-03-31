@@ -42,7 +42,8 @@ Text G
 """
 
 html_example_with_nested_sections_and_wikilinks = markdown.markdown(
-    markdown_example_with_nested_sections_and_wikilinks, extensions=[WikiLinkExtension()]
+    markdown_example_with_nested_sections_and_wikilinks,
+    extensions=[WikiLinkExtension()],
 )
 
 print(html_example_with_nested_sections_and_wikilinks)

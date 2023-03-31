@@ -16,7 +16,7 @@ def test_no_description():
 
     assert f() == 1
 
-    f.hyperparameters[1] = 2
+    f.hyperparameters[0] = 2
     assert f() == 2
 
     @enable_prompt_optimizer
@@ -25,8 +25,8 @@ def test_no_description():
 
     assert g() == "HelloHello"
 
-    g.hyperparameters["Hello"] = "World"
-    assert g() == "WorldWorld"
+    g.hyperparameters[1] = "World"
+    assert g() == "HelloWorld"
 
 
 def test_with_description():

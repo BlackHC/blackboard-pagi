@@ -130,3 +130,4 @@ build-backend = "poetry.core.masonry.api"
 addopts = [
     "--import-mode=importlib",
 ]
+python_files = "test_*.py"

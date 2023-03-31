@@ -2,7 +2,7 @@ from typing import Any, Collection, Iterable, List, Mapping, Optional
 
 from langchain.chat_models.base import BaseChatModel
 from langchain.schema import AIMessage, BaseMessage, ChatResult, messages_from_dict, messages_to_dict
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 def dict_to_tuple(d: Mapping[Any, Any]) -> tuple[tuple[Any, Any], ...]:
@@ -43,7 +43,7 @@ class FakeChatModel(BaseChatModel, BaseModel):
     outputs for different calls, for example.)
     """
 
-    messages_tuples_bag: set[tuple] = set()
+    messages_tuples_bag: set[tuple] = Field(default_factory=set)
     """The texts to return on call."""
     external_chat_model: BaseChatModel | None = None
     """An external LLM to use if the query is not found."""

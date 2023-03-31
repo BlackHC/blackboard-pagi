@@ -221,7 +221,11 @@ langchain.llm_cache = SQLiteCache(".chat.langchain.db")
 
 chat_model = CachedChatOpenAI(max_tokens=512)
 
-text_model = OpenAI(model_name="text-davinci-001", max_tokens=256, model_kwargs=dict(temperature=0.0))
+text_model = OpenAI(
+    model_name="text-davinci-001",
+    max_tokens=256,
+    model_kwargs=dict(temperature=0.0),
+)
 
 # blackboard = Blackboard("Answer the question: what's the proof that the square root of 2 is irrational?")
 blackboard = Blackboard(

@@ -17,8 +17,8 @@ from typing import Optional
 
 import langchain
 import yaml
-
-from blackboard_pagi.prompts import prompt_template
+from langchain.llms import BaseLLM
+from llm_strategy import prompt_template
 
 
 @dataclass
@@ -263,7 +263,7 @@ class Kernel:
     We also use the simplest possible API: llm(prompt) -> response.
     """
 
-    def __init__(self, llm: langchain.llms.LLM):
+    def __init__(self, llm: BaseLLM):
         self.llm = llm
 
     def summarize(self, user_prompt: str, answer: str) -> str:

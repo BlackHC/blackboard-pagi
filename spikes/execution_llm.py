@@ -45,7 +45,11 @@ langchain.llm_cache = SQLiteCache(".execution_llm_spike.langchain.db")
 # chat_model = CachedChatOpenAI(model_name="gpt-4", max_tokens=512)
 chat_model = CachedChatOpenAI(max_tokens=512)
 
-text_model = OpenAI(model_name="text-davinci-003", max_tokens=256, model_kwargs=dict(temperature=0.0))
+text_model = OpenAI(
+    model_name="text-davinci-003",
+    max_tokens=256,
+    model_kwargs=dict(temperature=0.0),
+)
 
 #%%
 
@@ -104,7 +108,13 @@ class Action(BaseModel):
 
 # Test parsing from obj
 action = Action.parse_obj(
-    {"params": {"action": "set_knowledge", "key": "Goal", "value": "Write a short paper about blackboard pattern"}}
+    {
+        "params": {
+            "action": "set_knowledge",
+            "key": "Goal",
+            "value": "Write a short paper about blackboard pattern",
+        }
+    }
 )
 action
 

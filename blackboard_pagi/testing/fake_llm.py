@@ -1,7 +1,7 @@
 from typing import Any, Mapping
 
 from langchain.llms.base import LLM, BaseLLM
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FakeLLM(LLM, BaseModel):
@@ -21,7 +21,7 @@ class FakeLLM(LLM, BaseModel):
     outputs for different calls, for example.)
     """
 
-    texts: set[str] = set()
+    texts: set[str] = Field(default_factory=set)
     """The texts to return on call."""
     external_llm: BaseLLM | None = None
     """An external LLM to use if the query is not found."""
@@ -43,6 +43,7 @@ class FakeLLM(LLM, BaseModel):
 
     def _call(self, prompt: str, stop: list[str] | None = None) -> str:
         """Return the query if it exists, else print the code to update the query."""
+        print(self.texts)
         for text in self.texts:
             if text.startswith(prompt):
                 # Remainder:

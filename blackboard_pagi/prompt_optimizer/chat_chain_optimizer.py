@@ -25,12 +25,16 @@ class _Hyperparameter:
     tracked_chat_chains: dict | None = None
     all_chat_chains: dict | None = None
 
+    unique_id: int = 0
+
     @staticmethod
     def set_default(key, default):
         return _Hyperparameter.hyperparameters.setdefault(key, default)
 
     def __matmul__(self, default):
-        return _Hyperparameter.set_default(default, default)
+        result = _Hyperparameter.set_default(self.unique_id, default)
+        _Hyperparameter.unique_id += 1
+        return result
 
     def __call__(self, description):
         return _HyperparameterWDescription(description)
@@ -163,6 +167,10 @@ def enable_prompt_optimizer(f) -> ProtocolCallableWPromptHyperparams:
             _Hyperparameter.all_chat_chains = {}
         else:
             _Hyperparameter.hyperparameters = old_hyperparameters.get(decorator.__qualname__, decorator.hyperparameters)
+
+        old_unique_id = _Hyperparameter.unique_id
+        _Hyperparameter.unique_id = 0
+
         result = f(*args, **kwargs)
         if old_hyperparameters is not None:
             old_hyperparameters[decorator.__qualname__] = _Hyperparameter.hyperparameters
@@ -177,7 +185,10 @@ def enable_prompt_optimizer(f) -> ProtocolCallableWPromptHyperparams:
             ]
             _Hyperparameter.tracked_chat_chains = dict()
             _Hyperparameter.all_chat_chains = dict()
+
         _Hyperparameter.hyperparameters = old_hyperparameters
+        _Hyperparameter.unique_id = old_unique_id
+
         return result
 
     # ignore attr-defined from mypy

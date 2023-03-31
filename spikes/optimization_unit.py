@@ -2,17 +2,14 @@
 Spike for a meta-loop that optimizes the prompt templates we use.
 """
 
-from copy import deepcopy
-from typing import Tuple
-
 import langchain
 from langchain import OpenAI
 from langchain.cache import SQLiteCache
 from langchain.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
+from pydantic.dataclasses import dataclass
 
 from blackboard_pagi.cached_chat_model import CachedChatOpenAI
-from blackboard_pagi.oracle_chain import Oracle
-from blackboard_pagi.prompt_optimizer.chat_chain_optimizer import hyperparameter_injector
 
 
 class PydanticDataclassOutputParser(PydanticOutputParser):
@@ -27,9 +24,73 @@ langchain.llm_cache = SQLiteCache(".execution_llm_spike.langchain.db")
 # chat_model = CachedChatOpenAI(model_name="gpt-4", max_tokens=512)
 chat_model = CachedChatOpenAI(max_tokens=512)
 
-text_model = OpenAI(model_name="text-davinci-003", max_tokens=256, model_kwargs=dict(temperature=0.0))
+text_model = OpenAI(
+    model_name="text-davinci-003",
+    max_tokens=256,
+    model_kwargs=dict(temperature=0.0),
+)
 
-#%%
+
+# %%
+
+
+class ExperimentRun(BaseModel):
+    """
+    The experiment run. This is the data we use to optimize the hyperparameters.
+    """
+
+    task_description: dict = Field(..., description="The task description as JSON")
+    hyperparameters: dict = Field(
+        ...,
+        description="The hyperparameters used for the experiment. We optimize these.",
+    )
+    outputs: dict = Field(..., description="The outputs of the experiment.")
+
+
+class ExperimentReflection(BaseModel):
+    """
+    The reflection on the experiment. These are the lessons we learn from each experiment run.
+    """
+
+    evaluation: str = Field(..., description="The evaluation of the outputs given the task.")
+    feedback: str = Field(
+        ...,
+        description="What should be improved in the outputs given the evaluation for the given task.",
+    )
+    hyperparameter_suggestion: str = Field(
+        ...,
+        description="Reflection on how we might want to change the hyperparameters to improve them.",
+    )
+
+
+class Experiment(BaseModel):
+    """
+    The experiment run and the reflection on the experiment.
+    """
+
+    run: ExperimentRun = Field(..., description="The experiment run.")
+    reflection: ExperimentReflection = Field(..., description="The reflection on the experiment.")
+
+
+class OptimizationInfo(BaseModel):
+    """
+    The optimization step. This is the data we use to optimize the hyperparameters.
+    """
+
+    log_summary: str | None = Field(
+        ...,
+        description="A summary of previous experiments and the proposed changes with the goal of avoiding trying the same changes repeatedly.",
+    )
+    experiments: list[Experiment] = Field(..., description="The experiments we have run so far.")
+
+
+class OptimizationStep(BaseModel):
+    """
+    The optimization step. New hyperparameters we want to try given the previous experiments.
+    """
+
+    optimization_info: OptimizationInfo = Field(..., description="The optimization info.")
+    suggestion: str = Field(..., description="The suggestion for the next experiment.")
 
 
 @dataclass
@@ -42,78 +103,3 @@ class Context:
 # We want to parse the actions from the model's output, and then execute them.
 
 # Can we use pydantic discriminators to do this?
-
-#%%
-from typing import Literal
-
-from pydantic import BaseModel, Field
-
-
-class KnowledgeAction(BaseModel):
-    """
-    An action to set or remove knowledge from the context.
-    """
-
-    action: Literal["set_knowledge", "remove_knowledge"]
-    key: str
-    value: str | None = None
-
-    def execute(self, context: Context):
-        if self.action == "set_knowledge":
-            context.knowledge[self.key] = self.value
-        elif self.action == "remove_knowledge":
-            del context.knowledge[self.key]
-        else:
-            raise ValueError(f"Unknown action {self.action}")
-
-
-class FinishAction(BaseModel):
-    """
-    An action to signal that the goal has been reached.
-    """
-
-    action: Literal["finish"]
-
-    def execute(self, context: Context):
-        print(context)
-
-
-class Action(BaseModel):
-    params: KnowledgeAction | FinishAction = Field(discriminator='action')
-
-
-# Test parsing from obj
-action = Action.parse_obj(
-    {"params": {"action": "set_knowledge", "key": "Goal", "value": "Write a short paper about blackboard pattern"}}
-)
-action
-
-#%%
-def processing_step(oracle: Oracle, context: Context) -> Tuple[Action, Context]:
-    output_parser = PydanticOutputParser()
-    output_parser.pydantic_object = Action
-
-    chain = oracle.start_oracle_chain(
-        f"---{context}\n\n---\n\nThis is the context you have access to and which you can operate on. "
-        "You can add knowledge to the context, or remove knowledge from the context. "
-        "You can also finish the execution of the blackboard pattern."
-    )
-    response, _ = chain.query("What do you want to do?\n\n---\n\n" f"{output_parser.get_format_instructions()}")
-
-    print(response)
-
-    action = output_parser.parse(response)
-
-    context = deepcopy(context)
-    action.params.execute(context)
-
-    return action, context
-
-
-oracle = Oracle(chat_model, text_model)
-context = Context(knowledge=dict(Goal="Write a short paper about blackboard pattern"))
-
-for _ in range(5):
-    action, context = processing_step(oracle, context)
-    if isinstance(action.params, FinishAction):
-        break

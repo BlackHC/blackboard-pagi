@@ -6,7 +6,7 @@ import io
 import re
 
 import numpy as np
-import PIL
+from PIL import Image
 
 
 def encode_embedding(embedding: np.ndarray):
@@ -26,7 +26,7 @@ def encode_embedding(embedding: np.ndarray):
     # Reshape
     embedding_np_bytes = embedding_np_bytes.reshape((square_size, square_size, 3))
     # Convert to png
-    image = PIL.Image.fromarray(embedding_np_bytes, mode="RGB")
+    image = Image.fromarray(embedding_np_bytes, mode="RGB")
     image_bytes_io = io.BytesIO()
     image.save(image_bytes_io, format="png")
     image_bytes = image_bytes_io.getvalue()
@@ -35,7 +35,7 @@ def encode_embedding(embedding: np.ndarray):
 
 def decode_embedding(png_bytes, embedding_size=1536):
     """Decode an embedding from a png."""
-    image = PIL.Image.open(io.BytesIO(png_bytes))
+    image = Image.open(io.BytesIO(png_bytes))
     # Turn into uint8 RGB image
     image = np.array(image, dtype=np.uint8).flatten()
     # Convert to bytes
@@ -89,5 +89,5 @@ def show_embedding(embedding: np.ndarray):
     import matplotlib.pyplot as plt
 
     png_bytes = encode_embedding(embedding)
-    plt.imshow(PIL.Image.open(io.BytesIO(png_bytes)))
+    plt.imshow(Image.open(io.BytesIO(png_bytes)))
     plt.show()
