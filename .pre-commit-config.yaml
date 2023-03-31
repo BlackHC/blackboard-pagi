@@ -38,3 +38,4 @@ repos:
           - types-click
           - types-PyYAML
           - types-dataclasses
+          - pydantic

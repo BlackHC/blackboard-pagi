@@ -1,4 +1,4 @@
-from llm_strategy.testing import fake_llm
+from blackboard_pagi.testing import fake_llm
 
 
 def test_fake_llm_query():

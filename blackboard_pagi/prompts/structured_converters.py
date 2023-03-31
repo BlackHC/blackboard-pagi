@@ -27,8 +27,6 @@ class LLMValue(LLMOptional, Generic[T]):
     value: T
     source: str
 
-    # this is a type check essentially -- how do we tell the type checker?
-
     def is_missing(self):
         return False
 

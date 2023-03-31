@@ -5,6 +5,10 @@ from typing import Annotated
 
 @dataclass
 class LLMField:
+    """
+    A class to represent a field in a LLM.
+    """
+
     description: str
 
     def __class_getitem__(cls, params):

@@ -16,6 +16,13 @@ class ChatChain:
         assert len(self.messages) >= 1
         return self.messages[-1].content
 
+    def append(self, messages: list[BaseMessage]) -> "ChatChain":
+        return dataclasses.replace(self, messages=self.messages + messages)
+
+    # overload operator +
+    def __add__(self, other: list[BaseMessage]) -> "ChatChain":
+        return self.append(other)
+
     def query(self, question: str) -> Tuple[str, "ChatChain"]:
         """Asks a question and returns the result in a single block."""
         # Build messages:
