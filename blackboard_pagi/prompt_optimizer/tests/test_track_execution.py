@@ -103,7 +103,7 @@ def test_chat_chain():
 
         assert chat_chain_2.get_full_message_chain() == []
 
-        response, chat_chain_3 = chat_chain_2.query("Hello")
+        response, chat_chain_3 = chat_chain_2.query("Hello", track=False)
 
         assert response == "World"
 
@@ -137,7 +137,7 @@ def test_chat_chain():
 
         assert chat_chain_2.get_compact_subtree_dict(include_all=False) == {}
 
-        response, chat_chain_5 = chat_chain_4.query("How are you?")
+        response, chat_chain_5 = chat_chain_4.query("How are you?", track=False)
         assert response == "Good. How are you?"
         assert chat_chain_5.get_full_message_chain() == [
             HumanMessage(content="Hello"),
@@ -156,7 +156,7 @@ def test_chat_chain():
             ],
         }
 
-        response, chat_chain_6 = chat_chain_4.query("What's up?")
+        response, chat_chain_6 = chat_chain_4.query("What's up?", track=False)
         assert response == "Nothing. You?"
         assert chat_chain_6.get_full_message_chain() == [
             HumanMessage(content="Hello"),

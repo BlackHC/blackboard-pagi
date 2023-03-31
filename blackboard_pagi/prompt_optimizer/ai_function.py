@@ -9,11 +9,10 @@ from langchain.chat_models.base import BaseChatModel
 from langchain.llms import BaseLLM
 from langchain.output_parsers import PydanticOutputParser
 from langchain.output_parsers.format_instructions import PYDANTIC_FORMAT_INSTRUCTIONS
-from langchain.schema import BaseLanguageModel
+from langchain.schema import BaseLanguageModel, OutputParserException
 from pydantic import BaseModel, create_model
 
-from blackboard_pagi.prompt_optimizer.track_execution import prompt_hyperparameter, track_execution
-from blackboard_pagi.prompts.chat_chain import ChatChain
+from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
 
 
 def get_json_schema_hyperparameters(schema: dict):
@@ -226,19 +225,54 @@ def ai_function(f) -> typing.Callable:
         )
 
         # get the response
+        num_retries = prompt_hyperparameter("num_retries") @ 3
+
         if language_model_or_chat_chain is None:
             raise ValueError("The language model or chat chain must be provided.")
         if isinstance(language_model_or_chat_chain, ChatChain):
-            output, _ = language_model_or_chat_chain.query(prompt)
-        elif isinstance(language_model_or_chat_chain, BaseChatModel):
-            output = language_model_or_chat_chain.call_as_llm(prompt)
-        elif isinstance(language_model_or_chat_chain, BaseLLM):
-            output = language_model_or_chat_chain(prompt)
+            chain = language_model_or_chat_chain
+            for _ in range(num_retries):
+                output, chain = chain.query(prompt)
+                prompt_hyperparameter.track_chain(chain)
+
+                try:
+                    parsed_output = parser.parse(output)
+                    break
+                except OutputParserException as e:
+                    prompt = (
+                        prompt_hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
+                        + str(e)
+                        + prompt_hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
+                    )
+            else:
+                raise OutputParserException(f"Failed to parse the output after {num_retries} retries.")
+        elif isinstance(language_model_or_chat_chain, BaseChatModel | BaseLLM):
+            new_prompt = prompt
+            for _ in range(prompt_hyperparameter("num_retries") @ 3):
+                prompt = new_prompt
+                if isinstance(language_model_or_chat_chain, BaseChatModel):
+                    output = language_model_or_chat_chain.call_as_llm(prompt)
+                elif isinstance(language_model_or_chat_chain, BaseLLM):
+                    output = language_model_or_chat_chain(prompt)
+
+                try:
+                    parsed_output = parser.parse(output)
+                    break
+                except OutputParserException as e:
+                    new_prompt = (
+                        prompt
+                        + prompt_hyperparameter("output_prompt") @ "\n\nReceived the output\n\n"
+                        + output
+                        + prompt_hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
+                        + str(e)
+                        + prompt_hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
+                    )
+            else:
+                prompt_hyperparameter.track_llm(prompt, output)
+                raise ValueError(f"Failed to parse the output after {num_retries} retries.")
+            prompt_hyperparameter.track_llm(prompt, output)
         else:
             raise ValueError("The language model or chat chain must be provided.")
-
-        # parse the output
-        parsed_output = parser.parse(output)
 
         return parsed_output.result  # type: ignore
 
