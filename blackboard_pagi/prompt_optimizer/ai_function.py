@@ -12,7 +12,7 @@ from langchain.output_parsers.format_instructions import PYDANTIC_FORMAT_INSTRUC
 from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, create_model
 
-from blackboard_pagi.prompt_optimizer.chat_chain_optimizer import enable_prompt_optimizer, prompt_hyperparameter
+from blackboard_pagi.prompt_optimizer.track_execution import prompt_hyperparameter, track_execution
 from blackboard_pagi.prompts.chat_chain import ChatChain
 
 
@@ -189,7 +189,7 @@ def ai_function(f) -> typing.Callable:
     # create the callable
 
     @functools.wraps(f)
-    @enable_prompt_optimizer
+    @track_execution
     def wrapped_f(language_model_or_chat_chain: BaseLanguageModel | ChatChain, *args, **kwargs):
         # bind the inputs to the signature
         bound_arguments = ai_function_spec.signature.bind(language_model_or_chat_chain, *args, **kwargs)

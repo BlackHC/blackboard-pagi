@@ -1,68 +1,64 @@
 import pytest
 from langchain.schema import AIMessage, HumanMessage
 
-from blackboard_pagi.prompt_optimizer.chat_chain_optimizer import (
-    ChatChain,
-    enable_prompt_optimizer,
-    prompt_hyperparameter,
-)
+from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
 from blackboard_pagi.testing.fake_chat_model import FakeChatModel
 
 
 def test_no_description():
-    @enable_prompt_optimizer
+    @track_execution
     def f():
         return prompt_hyperparameter @ 1
 
     assert f() == 1
 
-    f.hyperparameters[0] = 2
+    f.hyperparameters[f.__qualname__][0] = 2
     assert f() == 2
 
-    @enable_prompt_optimizer
+    @track_execution
     def g():
         return prompt_hyperparameter @ "Hello" + prompt_hyperparameter @ "Hello"
 
     assert g() == "HelloHello"
 
-    g.hyperparameters[1] = "World"
+    g.hyperparameters[g.__qualname__][1] = "World"
     assert g() == "HelloWorld"
 
 
 def test_with_description():
-    @enable_prompt_optimizer
+    @track_execution
     def f():
         return prompt_hyperparameter("Hello") @ 1
 
     assert f() == 1
 
-    f.hyperparameters["Hello"] = 2
+    f.hyperparameters[f.__qualname__]["Hello"] = 2
     assert f() == 2
 
-    @enable_prompt_optimizer
+    @track_execution
     def g():
         return prompt_hyperparameter("Hello") @ "Hello" + prompt_hyperparameter("Hello") @ "Hello"
 
     assert g() == "HelloHello"
 
-    g.hyperparameters["Hello"] = "World"
+    g.hyperparameters[g.__qualname__]["Hello"] = "World"
     assert g() == "WorldWorld"
 
 
 def test_nested():
-    @enable_prompt_optimizer
+    @track_execution
     def f():
         return prompt_hyperparameter("Hello") @ 1 + prompt_hyperparameter("World") @ 2
 
     assert f() == 3
 
-    @enable_prompt_optimizer
+    @track_execution
     def g():
         return prompt_hyperparameter("Hello") @ 3 + f()
 
     assert g() == 6
 
-    g.hyperparameters["Hello"] = 4
+    g.hyperparameters[g.__qualname__]["Hello"] = 4
 
     assert g() == 7
 
@@ -90,7 +86,7 @@ def test_chat_chain():
         ]
     )
 
-    @enable_prompt_optimizer
+    @track_execution
     def f():
         chat_chain = ChatChain(chat_model, [HumanMessage(content="Hello")])
 

@@ -6,25 +6,15 @@ from typing import List, Optional
 
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms import BaseLLM
-from langchain.schema import BaseMessage, ChatMessage, HumanMessage
+from langchain.schema import BaseMessage, ChatMessage, HumanMessage, LLMResult
 
 from blackboard_pagi.prompts import chat_chain
 
 
 @dataclass
-class _HyperparameterWDescription:
-    description: str
-
-    def __matmul__(self, default):
-        return self.set_default(default)
-
-    def set_default(self, default):
-        return _Hyperparameter.set_default(self.description, default)
-
-
-@dataclass
 class TrackedState:
-    hyperparameters: dict = dataclasses.field(default_factory=dict)
+    hyperparameters: dict
+    all_hyperparameters: dict
     unique_id: int = 0
 
     tracked_chat_chains: dict = dataclasses.field(default_factory=dict)
@@ -33,33 +23,91 @@ class TrackedState:
     tracked_prompts: dict = dataclasses.field(default_factory=dict)
     all_prompts: dict = dataclasses.field(default_factory=dict)
 
+    def set_default(self, *, default, key=None):
+        if key is None:
+            key = self.unique_id
+            self.unique_id += 1
+        result = self.hyperparameters.setdefault(key, default)
+        return result
 
-class _Hyperparameter:
-    hyperparameters: dict | None = None
-    tracked_chat_chains: dict | None = None
-    all_chat_chains: dict | None = None
 
-    unique_id: int = 0
+current_tracked_state: TrackedState | None = None
 
-    @staticmethod
-    def set_default(key, default):
-        return _Hyperparameter.hyperparameters.setdefault(key, default)
+
+@dataclass
+class _HyperparameterWDescription:
+    description: str
 
     def __matmul__(self, default):
-        result = _Hyperparameter.set_default(_Hyperparameter.unique_id, default)
-        _Hyperparameter.unique_id += 1
-        return result
+        return current_tracked_state.set_default(key=self.description, default=default)
+
+    def set_default(self, default):
+        return current_tracked_state.set_default(key=self.description, default=default)
+
+
+class _Hyperparameter:
+    @staticmethod
+    def set_default(default):
+        return current_tracked_state.set_default(default=default)
+
+    def __matmul__(self, default):
+        return current_tracked_state.set_default(default=default)
 
     def __call__(self, description):
         return _HyperparameterWDescription(description)
+
+    def track_chain(self, chain: 'ChatChain'):
+        chain.track()
+
+    def train_llm(self, prompt, response):
+        current_tracked_state.tracked_prompts[prompt] = response
 
 
 prompt_hyperparameter = _Hyperparameter()
 
 
 class WrappedLLM(BaseLLM):
-    def __call__(self, prompt: str, stop: Optional[List[str]] = None) -> str:
-        return super().__call__(prompt, stop)
+    inner_llm: BaseLLM
+
+    def __call__(self, prompt: str, stop: Optional[List[str]] = None, track: bool = False) -> str:
+        assert current_tracked_state is not None
+        result = self.inner_llm.__call__(prompt, stop)
+        current_tracked_state.all_prompts[prompt] = result
+        if track:
+            current_tracked_state.tracked_prompts[prompt] = result
+        return result
+
+    def _generate(self, prompts: List[str], stop: Optional[List[str]] = None) -> LLMResult:
+        raise NotImplementedError()
+
+    async def _agenerate(self, prompts: List[str], stop: Optional[List[str]] = None) -> LLMResult:
+        raise NotImplementedError()
+
+    @property
+    def _llm_type(self) -> str:
+        return self.inner_llm._llm_type
+
+
+class WrappedChatModelAsLLM(BaseLLM):
+    inner_chat_model: BaseChatModel
+
+    def __call__(self, prompt: str, stop: Optional[List[str]] = None, track: bool = False) -> str:
+        assert current_tracked_state is not None
+        result = self.inner_chat_model.call_as_llm(prompt, stop)
+        current_tracked_state.all_prompts[prompt] = result
+        if track:
+            current_tracked_state.tracked_prompts[prompt] = result
+        return result
+
+    def _generate(self, prompts: List[str], stop: Optional[List[str]] = None) -> LLMResult:
+        raise NotImplementedError()
+
+    async def _agenerate(self, prompts: List[str], stop: Optional[List[str]] = None) -> LLMResult:
+        raise NotImplementedError()
+
+    @property
+    def _llm_type(self) -> str:
+        return self.inner_chat_model.__repr_name__()
 
 
 @dataclass
@@ -81,7 +129,7 @@ class ChatChain(chat_chain.ChatChain):
 
     def __post_init__(self):
         if self.parent is None:
-            _Hyperparameter.all_chat_chains[id(self)] = self
+            current_tracked_state.all_chat_chains[id(self)] = self
 
     @property
     def response(self):
@@ -126,7 +174,7 @@ class ChatChain(chat_chain.ChatChain):
         while True:
             node.include_in_record = True
             if node.parent is None:
-                _Hyperparameter.tracked_chat_chains[id(node)] = node
+                current_tracked_state.tracked_chat_chains[id(node)] = node
                 break
             node = node.parent
 
@@ -168,45 +216,48 @@ class ChatChain(chat_chain.ChatChain):
 
 
 class ProtocolCallableWPromptHyperparams(typing.Protocol):
-    hyperparameters: dict[object, object]
+    hyperparameters: dict[str, dict[str | int, object]]
     tracked_chat_chains: list[dict]
     all_chat_chains: list[dict]
+    tracked_prompts: dict[str, str]
+    all_prompts: dict[str, str]
 
     def __call__(self, *args, **kwargs):
         pass
 
 
-def enable_prompt_optimizer(f) -> ProtocolCallableWPromptHyperparams:
+def track_execution(f) -> ProtocolCallableWPromptHyperparams:
     @functools.wraps(f)
     def decorator(*args, **kwargs):
-        old_hyperparameters = _Hyperparameter.hyperparameters
-        if old_hyperparameters is None:
-            _Hyperparameter.hyperparameters = decorator.hyperparameters
-            _Hyperparameter.tracked_chat_chains = {}
-            _Hyperparameter.all_chat_chains = {}
-        else:
-            _Hyperparameter.hyperparameters = old_hyperparameters.get(decorator.__qualname__, decorator.hyperparameters)
+        global current_tracked_state
+        old_tracker_state = current_tracked_state
 
-        old_unique_id = _Hyperparameter.unique_id
-        _Hyperparameter.unique_id = 0
+        try:
+            current_tracked_state = TrackedState(
+                hyperparameters=decorator.hyperparameters.setdefault(decorator.__qualname__, {}),
+                all_hyperparameters=decorator.hyperparameters,
+            )
+            result = f(*args, **kwargs)
+            if decorator.hyperparameters[decorator.__qualname__] == {}:
+                del decorator.hyperparameters[decorator.__qualname__]
+            if old_tracker_state is not None:
+                old_tracker_state.all_hyperparameters.update(current_tracked_state.all_hyperparameters)
+            else:
+                decorator.all_chat_chains = [
+                    chain.get_compact_subtree_dict(include_all=True)
+                    for chain in current_tracked_state.all_chat_chains.values()
+                ]
+                decorator.tracked_chat_chains = [
+                    chain.get_compact_subtree_dict(include_all=False)
+                    for chain in current_tracked_state.tracked_chat_chains.values()
+                    if chain.include_in_record
+                ]
+                decorator.tracked_prompts = current_tracked_state.tracked_prompts
+                decorator.all_prompts = current_tracked_state.all_prompts
 
-        result = f(*args, **kwargs)
-        if old_hyperparameters is not None:
-            old_hyperparameters[decorator.__qualname__] = _Hyperparameter.hyperparameters
-        else:
-            decorator.all_chat_chains = [
-                chain.get_compact_subtree_dict(include_all=True) for chain in _Hyperparameter.all_chat_chains.values()
-            ]
-            decorator.tracked_chat_chains = [
-                chain.get_compact_subtree_dict(include_all=False)
-                for chain in _Hyperparameter.tracked_chat_chains.values()
-                if chain.include_in_record
-            ]
-            _Hyperparameter.tracked_chat_chains = dict()
-            _Hyperparameter.all_chat_chains = dict()
-
-        _Hyperparameter.hyperparameters = old_hyperparameters
-        _Hyperparameter.unique_id = old_unique_id
+            decorator.hyperparameters = current_tracked_state.all_hyperparameters
+        finally:
+            current_tracked_state = old_tracker_state
 
         return result
 
@@ -214,7 +265,10 @@ def enable_prompt_optimizer(f) -> ProtocolCallableWPromptHyperparams:
     decorator.hyperparameters = {}  # type: ignore
     decorator.all_chat_chains = []  # type: ignore
     decorator.tracked_chat_chains = []  # type: ignore
+    decorator.tracked_prompts = {}  # type: ignore
+    decorator.all_prompts = {}  # type: ignore
+
     return decorator  # type: ignore
 
 
-__all__ = ["prompt_hyperparameter", "enable_prompt_optimizer", "ProtocolCallableWPromptHyperparams", "ChatChain"]
+__all__ = ["prompt_hyperparameter", "track_execution", "ProtocolCallableWPromptHyperparams", "ChatChain"]
