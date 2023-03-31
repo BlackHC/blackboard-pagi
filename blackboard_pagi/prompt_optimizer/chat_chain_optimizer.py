@@ -2,8 +2,10 @@ import dataclasses
 import functools
 import typing
 from dataclasses import dataclass
+from typing import List, Optional
 
 from langchain.chat_models.base import BaseChatModel
+from langchain.llms import BaseLLM
 from langchain.schema import BaseMessage, ChatMessage, HumanMessage
 
 from blackboard_pagi.prompts import chat_chain
@@ -14,10 +16,22 @@ class _HyperparameterWDescription:
     description: str
 
     def __matmul__(self, default):
-        return _Hyperparameter.set_default(self.description, default)
+        return self.set_default(default)
 
     def set_default(self, default):
         return _Hyperparameter.set_default(self.description, default)
+
+
+@dataclass
+class TrackedState:
+    hyperparameters: dict = dataclasses.field(default_factory=dict)
+    unique_id: int = 0
+
+    tracked_chat_chains: dict = dataclasses.field(default_factory=dict)
+    all_chat_chains: dict = dataclasses.field(default_factory=dict)
+
+    tracked_prompts: dict = dataclasses.field(default_factory=dict)
+    all_prompts: dict = dataclasses.field(default_factory=dict)
 
 
 class _Hyperparameter:
@@ -32,7 +46,7 @@ class _Hyperparameter:
         return _Hyperparameter.hyperparameters.setdefault(key, default)
 
     def __matmul__(self, default):
-        result = _Hyperparameter.set_default(self.unique_id, default)
+        result = _Hyperparameter.set_default(_Hyperparameter.unique_id, default)
         _Hyperparameter.unique_id += 1
         return result
 
@@ -41,6 +55,11 @@ class _Hyperparameter:
 
 
 prompt_hyperparameter = _Hyperparameter()
+
+
+class WrappedLLM(BaseLLM):
+    def __call__(self, prompt: str, stop: Optional[List[str]] = None) -> str:
+        return super().__call__(prompt, stop)
 
 
 @dataclass

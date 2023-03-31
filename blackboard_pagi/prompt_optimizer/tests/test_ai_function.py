@@ -1,14 +1,18 @@
 import inspect
 
 import pytest
+from langchain.chat_models.base import BaseChatModel
+from langchain.llms import BaseLLM
 from pydantic import Field, create_model
 
 from blackboard_pagi.prompt_optimizer.ai_function import (
     AIFunctionSpec,
     ai_function,
     get_json_schema_hyperparameters,
+    is_not_implemented,
     update_json_schema_hyperparameters,
 )
+from blackboard_pagi.prompts.chat_chain import ChatChain
 from blackboard_pagi.testing.fake_llm import FakeLLM
 
 
@@ -65,10 +69,19 @@ def test_update_json_schema_hyperparameters():
     }
 
 
+def not_implemented_function():
+    raise NotImplementedError
+
+
+def test_is_not_implemented_function():
+    assert is_not_implemented(not_implemented_function)
+    assert not is_not_implemented(lambda: 1)
+
+
 def test_ai_function_spec_from_function():
-    def f(a: str, b: int = 1) -> str:
+    def f(llm: BaseLLM, a: str, b: int = 1) -> str:
         """Test docstring."""
-        return a * b
+        raise NotImplementedError
 
     ai_function_spec = AIFunctionSpec.from_function(f)
     assert ai_function_spec.docstring == "Test docstring."
@@ -77,11 +90,64 @@ def test_ai_function_spec_from_function():
     assert ai_function_spec.output_model.schema() == create_model("FOutput", result=(str, ...)).schema()
 
 
+def test_ai_function_first_param():
+    def f(llm: BaseLLM, a: str, b: int = 1) -> str:
+        """Test docstring."""
+        raise NotImplementedError
+
+    assert AIFunctionSpec.from_function(f).input_model.schema() == {
+        'properties': {
+            'a': {'title': 'A', 'type': 'string'},
+            'b': {'title': 'B', 'type': 'integer', 'default': 1},
+        },
+        'required': ['a'],
+        'title': 'FInputs',
+        'type': 'object',
+    }
+
+    def g(chat_model: BaseChatModel, a: str, b: int = 1) -> str:
+        """Test docstring."""
+        raise NotImplementedError
+
+    assert AIFunctionSpec.from_function(g).input_model.schema() == {
+        'properties': {
+            'a': {'title': 'A', 'type': 'string'},
+            'b': {'title': 'B', 'type': 'integer', 'default': 1},
+        },
+        'required': ['a'],
+        'title': 'GInputs',
+        'type': 'object',
+    }
+
+    def h(chat_chain: ChatChain, a: str, b: int = 1) -> str:
+        """Test docstring."""
+        raise NotImplementedError
+
+    assert AIFunctionSpec.from_function(h).input_model.schema() == {
+        'properties': {
+            'a': {'title': 'A', 'type': 'string'},
+            'b': {'title': 'B', 'type': 'integer', 'default': 1},
+        },
+        'required': ['a'],
+        'title': 'HInputs',
+        'type': 'object',
+    }
+
+    # with a wrong type
+    with pytest.raises(ValueError):
+
+        def i(x: int, a: str, b: int = 1) -> str:
+            """Test docstring."""
+            raise NotImplementedError
+
+        AIFunctionSpec.from_function(i)
+
+
 def test_ai_function_spec_from_function_with_field():
     # Use Pydantic's Field to specify a default value.
-    def f(a: str, b=Field(3)) -> str:
+    def f(llm: BaseLLM, a: str, b=Field(3)) -> str:
         """Test docstring."""
-        return a * b
+        raise NotImplementedError
 
     ai_function_spec = AIFunctionSpec.from_function(f)
 
@@ -90,9 +156,9 @@ def test_ai_function_spec_from_function_with_field():
 
 def test_ai_function_spec_from_function_with_field_description_no_default():
     # Use Pydantic's Field to specify a description.
-    def f(a: str, b: int = Field(..., description="test")) -> str:
+    def f(llm: BaseLLM, a: str, b: int = Field(..., description="test")) -> str:
         """Test docstring."""
-        return a * b
+        raise NotImplementedError
 
     ai_function_spec = AIFunctionSpec.from_function(f)
 
@@ -108,33 +174,35 @@ def test_ai_function_spec_from_function_with_field_description_no_default():
 
 
 def test_ai_function_spec_from_function_no_docstring():
-    def f(a: str, b: int = 1) -> str:
-        return a * b
+    def f(llm: BaseLLM, a: str, b: int = 1) -> str:
+        raise NotImplementedError
 
     with pytest.raises(ValueError):
         AIFunctionSpec.from_function(f)
 
 
 def test_ai_function_spec_from_function_no_return_type():
-    def f(a: str, b: int = 1):
-        return a * b
+    def f(llm: BaseLLM, a: str, b: int = 1):
+        """Test docstring."""
+        raise NotImplementedError
 
     with pytest.raises(ValueError):
         AIFunctionSpec.from_function(f)
 
 
 def test_ai_function_spec_from_function_no_parameter_annotation():
-    def f(a, b: int = 1) -> str:
-        return a * b
+    def f(llm: BaseLLM, a, b: int = 1) -> str:
+        """Test docstring."""
+        raise NotImplementedError
 
     with pytest.raises(ValueError):
         AIFunctionSpec.from_function(f)
 
 
 def test_ai_function_spec_from_function_no_parameter_annotation_but_default():
-    def f(a=1, b: int = 1) -> str:
+    def f(llm: BaseLLM, a=1, b: int = 1) -> str:
         """Test docstring."""
-        return a * b
+        raise NotImplementedError
 
     ai_function_spec = AIFunctionSpec.from_function(f)
     assert ai_function_spec.input_model.schema() == create_model("FInputs", a=(int, 1), b=(int, 1)).schema()
@@ -142,13 +210,13 @@ def test_ai_function_spec_from_function_no_parameter_annotation_but_default():
 
 def test_ai_function():
     @ai_function
-    def add(a: int, b: int) -> int:
+    def add(llm: BaseLLM, a: int, b: int) -> int:
         """
         Add two numbers.
         """
-        return a + b
+        raise NotImplementedError
 
-    add.language_model = FakeLLM(
+    fake_llm = FakeLLM(
         texts=[
             'Add two numbers.\n'
             'The inputs are formatted as JSON using the following schema:\n'
@@ -172,4 +240,7 @@ def test_ai_function():
         ]
     )
 
-    assert add(1, 2) == 3
+    assert add.__doc__ == '\n        Add two numbers.\n        '
+    print(inspect.signature(inspect.unwrap(add)))
+    assert add(fake_llm, 1, 2) == 3
+    assert add.__doc__ == inspect.unwrap(add).__doc__

@@ -1,27 +1,19 @@
+import dis
 import functools
 import inspect
 import json
 import typing
 from dataclasses import dataclass
 
+from langchain.chat_models.base import BaseChatModel
 from langchain.llms import BaseLLM
 from langchain.output_parsers import PydanticOutputParser
 from langchain.output_parsers.format_instructions import PYDANTIC_FORMAT_INSTRUCTIONS
+from langchain.schema import BaseLanguageModel
 from pydantic import BaseModel, create_model
 
 from blackboard_pagi.prompt_optimizer.chat_chain_optimizer import enable_prompt_optimizer, prompt_hyperparameter
-
-
-@dataclass
-class CallableWithLanguageModelProperty:
-    """
-    A callable that can be called with a chat model.
-    """
-
-    language_model: BaseLLM | None = None
-
-    def __call__(self, *args, **kwargs):
-        raise NotImplementedError()
+from blackboard_pagi.prompts.chat_chain import ChatChain
 
 
 def get_json_schema_hyperparameters(schema: dict):
@@ -55,6 +47,48 @@ def update_json_schema_hyperparameters(schema: dict, hyperparameters: dict):
             schema[key] = value
 
 
+def is_not_implemented(f: typing.Callable) -> bool:
+    """Check that a function only raises NotImplementedError."""
+    unwrapped_f = inspect.unwrap(f)
+
+    if not hasattr(unwrapped_f, "__code__"):
+        raise ValueError(f"Cannot check whether {f} is implemented. Where is __code__?")
+
+    # Inspect the opcodes
+    code = unwrapped_f.__code__
+    # Get the opcodes
+    opcodes = list(dis.get_instructions(code))
+    # Check that it only uses the following opcodes:
+    # - RESUME
+    # - LOAD_GLOBAL
+    # - PRECALL
+    # - CALL
+    # - RAISE_VARARGS
+    valid_opcodes = {
+        "RESUME",
+        "LOAD_GLOBAL",
+        "PRECALL",
+        "CALL",
+        "RAISE_VARARGS",
+    }
+    # We allow at most a function of length len(valid_opcodes)
+    if len(opcodes) > len(valid_opcodes):
+        return False
+    for opcode in opcodes:
+        if opcode.opname not in valid_opcodes:
+            return False
+        # Check that the function only raises NotImplementedError
+        if opcode.opname == "LOAD_GLOBAL" and opcode.argval != "NotImplementedError":
+            return False
+        if opcode.opname == "RAISE_VARARGS" and opcode.argval != 1:
+            return False
+        valid_opcodes.remove(opcode.opname)
+    # Check that the function raises a NotImplementedError at the end.
+    if opcodes[-1].opname != "RAISE_VARARGS":
+        return False
+    return True
+
+
 @dataclass
 class AIFunctionSpec:
     signature: inspect.Signature
@@ -64,6 +98,11 @@ class AIFunctionSpec:
 
     @staticmethod
     def from_function(f):
+        """Create an AIFunctionSpec from a function."""
+
+        if not is_not_implemented(f):
+            raise ValueError("The function must not be implemented.")
+
         # get clean docstring of
         docstring = inspect.getdoc(f)
         if docstring is None:
@@ -72,26 +111,40 @@ class AIFunctionSpec:
         signature = inspect.signature(f)
         # get all parameters
         parameters = signature.parameters
+        # check that there is at least one parameter
+        if not parameters:
+            raise ValueError("The function must have at least one parameter.")
+        # check that the first parameter has a type annotation that is an instance of BaseLanguageModel
+        # or a TrackedChatChain
+        first_parameter = next(iter(parameters.values()))
+        if first_parameter.annotation is inspect.Parameter.empty:
+            raise ValueError("The first parameter must have a type annotation.")
+        if not issubclass(first_parameter.annotation, BaseLanguageModel | ChatChain):
+            raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
+
         # create a pydantic model from the parameters
-        parameter_dict = {}
-        for parameter_name, parameter in parameters.items():
+        input_parameter_dict = {}
+        for i, (parameter_name, parameter) in enumerate(parameters.items()):
+            # skip the first parameter
+            if i == 0:
+                continue
             # every parameter must be annotated or have a default value
             if parameter.annotation is inspect.Parameter.empty:
                 # check if the parameter has a default value
                 if parameter.default is inspect.Parameter.empty:
                     raise ValueError(f"The parameter {parameter_name} must be annotated or have a default value.")
-                parameter_dict[parameter_name] = parameter.default
+                input_parameter_dict[parameter_name] = parameter.default
             elif parameter.default is inspect.Parameter.empty:
-                parameter_dict[parameter_name] = (parameter.annotation, ...)
+                input_parameter_dict[parameter_name] = (parameter.annotation, ...)
             else:
-                parameter_dict[parameter_name] = (
+                input_parameter_dict[parameter_name] = (
                     parameter.annotation,
                     parameter.default,
                 )
         # turn the function name into a class name
         class_name_prefix = f.__name__.capitalize()
         # create the model
-        input_model = create_model(f"{class_name_prefix}Inputs", **parameter_dict)  # type: ignore
+        input_model = create_model(f"{class_name_prefix}Inputs", **input_parameter_dict)  # type: ignore
         # get the return type
         return_type = signature.return_annotation
         if return_type is inspect.Signature.empty:
@@ -112,74 +165,81 @@ class AIFunctionSpec:
         )
 
 
-def ai_function(f) -> CallableWithLanguageModelProperty:
+def get_clean_schema(object_type: type[BaseModel]):
+    schema = object_type.schema()
+    # remove title and type
+    schema.pop("title")
+    schema.pop("type")
+    return schema
+
+
+def ai_function(f) -> typing.Callable:
     """
     Decorator to wrap a function with a chat model.
 
     f is a function to a dataclass or Pydantic model.
 
     The docstring of the function provides instructions for the model.
+
+    The first parameter of the function must be an instance of BaseLanguageModel or ChatChain.
     """
 
     ai_function_spec = AIFunctionSpec.from_function(f)
 
     # create the callable
-    class AIFunction(CallableWithLanguageModelProperty):
-        @functools.wraps(f)
-        @enable_prompt_optimizer
-        def __call__(self, *args, **kwargs):
-            # bind the inputs to the signature
-            bound_arguments = ai_function_spec.signature.bind(*args, **kwargs)
-            # get the arguments
-            arguments = bound_arguments.arguments
-            inputs = ai_function_spec.input_model(**arguments)
 
-            parser = PydanticOutputParser(pydantic_object=ai_function_spec.output_model)
+    @functools.wraps(f)
+    @enable_prompt_optimizer
+    def wrapped_f(language_model_or_chat_chain: BaseLanguageModel | ChatChain, *args, **kwargs):
+        # bind the inputs to the signature
+        bound_arguments = ai_function_spec.signature.bind(language_model_or_chat_chain, *args, **kwargs)
+        # get the arguments
+        arguments = bound_arguments.arguments
+        inputs = ai_function_spec.input_model(**arguments)
 
-            # get the input schema as JSON
-            input_schema = ai_function_spec.input_model.schema()
-            # remove title and type
-            input_schema.pop("title")
-            input_schema.pop("type")
+        parser = PydanticOutputParser(pydantic_object=ai_function_spec.output_model)
 
-            output_schema = ai_function_spec.output_model.schema()
-            # remove title and type
-            output_schema.pop("title")
-            output_schema.pop("type")
+        # get the input schema as JSON
+        input_schema = get_clean_schema(ai_function_spec.input_model)
+        output_schema = get_clean_schema(ai_function_spec.output_model)
 
-            update_json_schema_hyperparameters(
-                input_schema,
-                prompt_hyperparameter("input_schema") @ get_json_schema_hyperparameters(input_schema),
-            )
+        update_json_schema_hyperparameters(
+            input_schema,
+            prompt_hyperparameter("input_schema") @ get_json_schema_hyperparameters(input_schema),
+        )
 
-            update_json_schema_hyperparameters(
-                output_schema,
-                prompt_hyperparameter("output_schema") @ get_json_schema_hyperparameters(output_schema),
-            )
+        update_json_schema_hyperparameters(
+            output_schema,
+            prompt_hyperparameter("output_schema") @ get_json_schema_hyperparameters(output_schema),
+        )
 
-            # create the prompt
-            prompt = (
-                f"{prompt_hyperparameter('docstring') @ ai_function_spec.docstring}\n"
-                "The inputs are formatted as JSON using the following schema:\n"
-                f"{json.dumps(input_schema)}\n"
-                "\n"
-                f"{PYDANTIC_FORMAT_INSTRUCTIONS.format(schema=json.dumps(output_schema))}"
-                "\n"
-                "Now output the results for the following inputs:\n"
-                f"{inputs.json()}"
-            )
+        # create the prompt
+        prompt = (
+            f"{prompt_hyperparameter('docstring') @ ai_function_spec.docstring}\n"
+            "The inputs are formatted as JSON using the following schema:\n"
+            f"{json.dumps(input_schema)}\n"
+            "\n"
+            f"{PYDANTIC_FORMAT_INSTRUCTIONS.format(schema=json.dumps(output_schema))}"
+            "\n"
+            "Now output the results for the following inputs:\n"
+            f"{inputs.json()}"
+        )
 
-            # get the chat model
-            language_model = self.language_model
-            if language_model is None:
-                raise ValueError("The chat model must be set.")
+        # get the response
+        if language_model_or_chat_chain is None:
+            raise ValueError("The language model or chat chain must be provided.")
+        if isinstance(language_model_or_chat_chain, ChatChain):
+            output, _ = language_model_or_chat_chain.query(prompt)
+        elif isinstance(language_model_or_chat_chain, BaseChatModel):
+            output = language_model_or_chat_chain.call_as_llm(prompt)
+        elif isinstance(language_model_or_chat_chain, BaseLLM):
+            output = language_model_or_chat_chain(prompt)
+        else:
+            raise ValueError("The language model or chat chain must be provided.")
 
-            # get the output
-            output = language_model(prompt)
+        # parse the output
+        parsed_output = parser.parse(output)
 
-            # parse the output
-            parsed_output: ai_function_spec.output_model = parser.parse(output)
+        return parsed_output.result  # type: ignore
 
-            return parsed_output.result
-
-    return AIFunction()
+    return wrapped_f
