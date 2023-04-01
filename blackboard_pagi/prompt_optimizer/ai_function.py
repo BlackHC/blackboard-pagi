@@ -3,6 +3,7 @@ import functools
 import inspect
 import json
 import typing
+from copy import deepcopy
 from dataclasses import dataclass
 
 from langchain.chat_models.base import BaseChatModel
@@ -13,6 +14,7 @@ from langchain.schema import BaseLanguageModel, OutputParserException
 from pydantic import BaseModel, create_model
 
 from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
+from blackboard_pagi.prompts.chat_chain import ChatChain as UntrackedChatChain
 
 
 def get_json_schema_hyperparameters(schema: dict):
@@ -116,10 +118,9 @@ class AIFunctionSpec:
         # check that the first parameter has a type annotation that is an instance of BaseLanguageModel
         # or a TrackedChatChain
         first_parameter = next(iter(parameters.values()))
-        if first_parameter.annotation is inspect.Parameter.empty:
-            raise ValueError("The first parameter must have a type annotation.")
-        if not issubclass(first_parameter.annotation, BaseLanguageModel | ChatChain):
-            raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
+        if first_parameter.annotation is not inspect.Parameter.empty:
+            if issubclass(first_parameter.annotation, BaseLanguageModel | ChatChain):
+                raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
 
         # create a pydantic model from the parameters
         input_parameter_dict = {}
@@ -165,14 +166,21 @@ class AIFunctionSpec:
 
 
 def get_clean_schema(object_type: type[BaseModel]):
-    schema = object_type.schema()
+    schema = deepcopy(object_type.schema())
     # remove title and type
     schema.pop("title")
     schema.pop("type")
     return schema
 
 
-def ai_function(f) -> typing.Callable:
+class ProtocolAIFunction(typing.Protocol):
+    ai_function_spec: AIFunctionSpec
+
+    def __call__(self, *args, **kwargs):
+        pass
+
+
+def ai_function(f) -> ProtocolAIFunction:
     """
     Decorator to wrap a function with a chat model.
 
@@ -187,9 +195,14 @@ def ai_function(f) -> typing.Callable:
 
     # create the callable
 
-    @functools.wraps(f)
     @track_execution
-    def wrapped_f(language_model_or_chat_chain: BaseLanguageModel | ChatChain, *args, **kwargs):
+    @functools.wraps(f)
+    def ai_executor(language_model_or_chat_chain: BaseLanguageModel | ChatChain | UntrackedChatChain, *args, **kwargs):
+        if isinstance(language_model_or_chat_chain, UntrackedChatChain):
+            language_model_or_chat_chain = ChatChain(
+                language_model_or_chat_chain.chat_model, language_model_or_chat_chain.messages
+            )
+
         # bind the inputs to the signature
         bound_arguments = ai_function_spec.signature.bind(language_model_or_chat_chain, *args, **kwargs)
         # get the arguments
@@ -214,18 +227,18 @@ def ai_function(f) -> typing.Callable:
 
         # create the prompt
         prompt = (
-            f"{prompt_hyperparameter('docstring') @ ai_function_spec.docstring}\n"
+            f"{prompt_hyperparameter('docstring') @ ai_function_spec.docstring}\n\n"
             "The inputs are formatted as JSON using the following schema:\n"
-            f"{json.dumps(input_schema)}\n"
+            f"{json.dumps(input_schema, indent=1)}\n"
             "\n"
-            f"{PYDANTIC_FORMAT_INSTRUCTIONS.format(schema=json.dumps(output_schema))}"
+            f"{PYDANTIC_FORMAT_INSTRUCTIONS.format(schema=json.dumps(output_schema, indent=1))}"
             "\n"
             "Now output the results for the following inputs:\n"
-            f"{inputs.json()}"
+            f"{inputs.json(indent=1)}"
         )
 
         # get the response
-        num_retries = prompt_hyperparameter("num_retries") @ 3
+        num_retries = prompt_hyperparameter("num_retries_on_parser_failure") @ 3
 
         if language_model_or_chat_chain is None:
             raise ValueError("The language model or chat chain must be provided.")
@@ -248,7 +261,7 @@ def ai_function(f) -> typing.Callable:
                 raise OutputParserException(f"Failed to parse the output after {num_retries} retries.")
         elif isinstance(language_model_or_chat_chain, BaseChatModel | BaseLLM):
             new_prompt = prompt
-            for _ in range(prompt_hyperparameter("num_retries") @ 3):
+            for _ in range(num_retries):
                 prompt = new_prompt
                 if isinstance(language_model_or_chat_chain, BaseChatModel):
                     output = language_model_or_chat_chain.call_as_llm(prompt)
@@ -276,4 +289,5 @@ def ai_function(f) -> typing.Callable:
 
         return parsed_output.result  # type: ignore
 
-    return wrapped_f
+    ai_executor.ai_function_spec = ai_function_spec  # type: ignore
+    return ai_executor  # type: ignore

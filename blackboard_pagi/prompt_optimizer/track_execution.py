@@ -68,6 +68,19 @@ class _Hyperparameter:
         current_tracked_state.tracked_prompts[prompt] = response
         current_tracked_state.all_prompts[prompt] = response
 
+    @staticmethod
+    def merge(root, updated_hyperparameters: dict):
+        """
+        Merge the hyperparameters into the root's all_hyperparameters.
+
+        root.all_hyperparameters points to all relevant hyperparameter dicts.
+        """
+        all_hyperparameters = root.all_hyperparameters
+        for qualname, hyperparameters in updated_hyperparameters.items():
+            if qualname not in all_hyperparameters:
+                raise ValueError(f"{qualname} not in {root.__qualname__}.all_hyperparameters!")
+            all_hyperparameters[qualname].update(hyperparameters)
+
 
 prompt_hyperparameter = _Hyperparameter()
 
@@ -135,14 +148,14 @@ def track_execution(f) -> ProtocolCallableWPromptHyperparams:
         old_tracker_state = current_tracked_state
 
         try:
-            decorator.all_hyperparameters[decorator.__qualname__] = decorator.hyperparameters
+            decorator.all_hyperparameters[f.__qualname__] = decorator.hyperparameters
             current_tracked_state = TrackedState(
                 hyperparameters=decorator.hyperparameters,
                 all_hyperparameters=decorator.all_hyperparameters,
             )
             result = f(*args, **kwargs)
-            if decorator.all_hyperparameters[decorator.__qualname__] == {}:
-                del decorator.all_hyperparameters[decorator.__qualname__]
+            if decorator.all_hyperparameters[f.__qualname__] == {}:
+                del decorator.all_hyperparameters[f.__qualname__]
             if old_tracker_state is not None:
                 old_tracker_state.all_hyperparameters.update(current_tracked_state.all_hyperparameters)
             else:
@@ -166,7 +179,7 @@ def track_execution(f) -> ProtocolCallableWPromptHyperparams:
 
     # ignore attr-defined from mypy
     decorator.hyperparameters = {}  # type: ignore
-    decorator.all_hyperparameters = {decorator.__qualname__: decorator.hyperparameters}  # type: ignore
+    decorator.all_hyperparameters = {f.__qualname__: decorator.hyperparameters}  # type: ignore
     decorator.all_chat_chains = []  # type: ignore
     decorator.tracked_chat_chains = []  # type: ignore
     decorator.tracked_prompts = {}  # type: ignore
@@ -241,7 +254,7 @@ class ChatChain(chat_chain.ChatChain):
         parser = PydanticOutputParser(pydantic_object=output_model)
         question_and_formatting = question + "\n\n" + parser.get_format_instructions()
 
-        num_retries = prompt_hyperparameter("num_retries") @ 3
+        num_retries = prompt_hyperparameter("num_retries_on_parser_failure") @ 3
         prompt = question_and_formatting
         chain = self
         for _ in range(num_retries):
