@@ -68,6 +68,7 @@ class FakeLLM(LLM, BaseModel):
             + "\n".join(map(repr, prompt.splitlines(True)))
             + "\n# TODO: Append the correct response here"
         )
+        print(code_snippet)
         raise NotImplementedError("No query provided. Add the following to the queries dict:\n\n" + code_snippet)
 
     @property

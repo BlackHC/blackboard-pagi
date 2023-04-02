@@ -2,19 +2,24 @@ import dis
 import functools
 import inspect
 import json
+import types
 import typing
 from copy import deepcopy
 from dataclasses import dataclass
 
+import pydantic
+import typing_extensions
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms import BaseLLM
 from langchain.output_parsers import PydanticOutputParser
-from langchain.output_parsers.format_instructions import PYDANTIC_FORMAT_INSTRUCTIONS
 from langchain.schema import BaseLanguageModel, OutputParserException
 from pydantic import BaseModel, create_model
 
 from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
 from blackboard_pagi.prompts.chat_chain import ChatChain as UntrackedChatChain
+
+T = typing.TypeVar("T")
+P = typing_extensions.ParamSpec("P")
 
 
 def get_json_schema_hyperparameters(schema: dict):
@@ -48,9 +53,24 @@ def update_json_schema_hyperparameters(schema: dict, hyperparameters: dict):
             schema[key] = value
 
 
+def unwrap_function(f: typing.Callable[P, T]) -> typing.Callable[P, T]:
+    # is f a property?
+    if isinstance(f, property):
+        f = f.fget
+    # is f a wrapped function?
+    elif hasattr(f, "__wrapped__"):
+        f = inspect.unwrap(f)
+    elif inspect.ismethod(f):
+        f = f.__func__
+    else:
+        return f
+
+    return unwrap_function(f)
+
+
 def is_not_implemented(f: typing.Callable) -> bool:
     """Check that a function only raises NotImplementedError."""
-    unwrapped_f = inspect.unwrap(f)
+    unwrapped_f = unwrap_function(f)
 
     if not hasattr(unwrapped_f, "__code__"):
         raise ValueError(f"Cannot check whether {f} is implemented. Where is __code__?")
@@ -90,15 +110,36 @@ def is_not_implemented(f: typing.Callable) -> bool:
     return True
 
 
+class TyperWrapper(str):
+    """
+    A wrapper around a type that can be used to create a Pydantic model.
+
+    This is used to support @classmethods.
+    """
+
+    @classmethod
+    def __get_validators__(cls) -> typing.Iterator[typing.Callable]:
+        # one or more validators may be yielded which will be called in the
+        # order to validate the input, each validator will receive as an input
+        # the value returned from the previous validator
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v: type) -> str:
+        if not isinstance(v, type):
+            raise TypeError("type required")
+        return v.__qualname__
+
+
 @dataclass
 class AIFunctionSpec:
     signature: inspect.Signature
     docstring: str
-    input_model: type[BaseModel]
-    output_model: type[BaseModel]
+    input_model: typing.Type[BaseModel]
+    output_model: typing.Type[BaseModel]
 
     @staticmethod
-    def from_function(f):
+    def from_function(f: typing.Callable[P, T]) -> "AIFunctionSpec":
         """Create an AIFunctionSpec from a function."""
 
         if not is_not_implemented(f):
@@ -109,7 +150,7 @@ class AIFunctionSpec:
         if docstring is None:
             raise ValueError("The function must have a docstring.")
         # get the type of the first argument
-        signature = inspect.signature(f)
+        signature = inspect.signature(f, eval_str=True)
         # get all parameters
         parameters = signature.parameters
         # check that there is at least one parameter
@@ -119,32 +160,38 @@ class AIFunctionSpec:
         # or a TrackedChatChain
         first_parameter = next(iter(parameters.values()))
         if first_parameter.annotation is not inspect.Parameter.empty:
-            if issubclass(first_parameter.annotation, BaseLanguageModel | ChatChain):
+            if not issubclass(first_parameter.annotation, BaseLanguageModel | ChatChain):
                 raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
 
         # create a pydantic model from the parameters
-        input_parameter_dict = {}
+        parameter_dict = {}
         for i, (parameter_name, parameter) in enumerate(parameters.items()):
             # skip the first parameter
             if i == 0:
                 continue
             # every parameter must be annotated or have a default value
-            if parameter.annotation is inspect.Parameter.empty:
+            annotation = parameter.annotation
+            if annotation is type:
+                annotation = TyperWrapper
+
+            if annotation is inspect.Parameter.empty:
                 # check if the parameter has a default value
                 if parameter.default is inspect.Parameter.empty:
                     raise ValueError(f"The parameter {parameter_name} must be annotated or have a default value.")
-                input_parameter_dict[parameter_name] = parameter.default
+                parameter_dict[parameter_name] = parameter.default
             elif parameter.default is inspect.Parameter.empty:
-                input_parameter_dict[parameter_name] = (parameter.annotation, ...)
+                parameter_dict[parameter_name] = (annotation, ...)
             else:
-                input_parameter_dict[parameter_name] = (
-                    parameter.annotation,
+                parameter_dict[parameter_name] = (
+                    annotation,
                     parameter.default,
                 )
+
         # turn the function name into a class name
         class_name_prefix = f.__name__.capitalize()
         # create the model
-        input_model = create_model(f"{class_name_prefix}Inputs", **input_parameter_dict)  # type: ignore
+        input_model = create_model(f"{class_name_prefix}Inputs", **parameter_dict)
+        input_model.update_forward_refs()
         # get the return type
         return_type = signature.return_annotation
         if return_type is inspect.Signature.empty:
@@ -155,7 +202,8 @@ class AIFunctionSpec:
             return_info = typing.get_args(return_type)
         else:
             return_info = (return_type, ...)
-        output_model = create_model(f"{class_name_prefix}Output", result=return_info)  # type: ignore
+        output_model = create_model(f"{class_name_prefix}Output", return_value=return_info)
+        output_model.update_forward_refs()
 
         return AIFunctionSpec(
             docstring=docstring,
@@ -165,77 +213,78 @@ class AIFunctionSpec:
         )
 
 
-def get_clean_schema(object_type: type[BaseModel]):
-    schema = deepcopy(object_type.schema())
-    # remove title and type
-    schema.pop("title")
-    schema.pop("type")
-    return schema
+def get_call_schema(input_type: type[BaseModel], output_type: type[BaseModel]):
+    schema = pydantic.schema.schema([input_type, output_type])
+    definitions = deepcopy(schema["definitions"])
+    # remove title and type from each sub dict in the definitions
+    for value in definitions.values():
+        value.pop("title")
+        value.pop("type")
+
+    return definitions
 
 
-class ProtocolAIFunction(typing.Protocol):
-    ai_function_spec: AIFunctionSpec
-
-    def __call__(self, *args, **kwargs):
-        pass
-
-
-def ai_function(f) -> ProtocolAIFunction:
+@dataclass
+class AIFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
     """
-    Decorator to wrap a function with a chat model.
-
-    f is a function to a dataclass or Pydantic model.
-
-    The docstring of the function provides instructions for the model.
-
-    The first parameter of the function must be an instance of BaseLanguageModel or ChatChain.
+    A callable that can be called with a chat model.
     """
 
-    ai_function_spec = AIFunctionSpec.from_function(f)
+    spec: AIFunctionSpec
 
-    # create the callable
+    def __getattr__(self, name: str) -> typing.Any:
+        return getattr(self.__wrapped__, name)
 
-    @track_execution
-    @functools.wraps(f)
-    def ai_executor(language_model_or_chat_chain: BaseLanguageModel | ChatChain | UntrackedChatChain, *args, **kwargs):
+    def __call__(
+        self,
+        language_model_or_chat_chain: BaseLanguageModel | ChatChain | UntrackedChatChain,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> T:
         if isinstance(language_model_or_chat_chain, UntrackedChatChain):
             language_model_or_chat_chain = ChatChain(
                 language_model_or_chat_chain.chat_model, language_model_or_chat_chain.messages
             )
 
         # bind the inputs to the signature
-        bound_arguments = ai_function_spec.signature.bind(language_model_or_chat_chain, *args, **kwargs)
+        bound_arguments = self.spec.signature.bind(language_model_or_chat_chain, *args, **kwargs)
         # get the arguments
         arguments = bound_arguments.arguments
-        inputs = ai_function_spec.input_model(**arguments)
+        inputs = self.spec.input_model(**arguments)
 
-        parser = PydanticOutputParser(pydantic_object=ai_function_spec.output_model)
+        parser = PydanticOutputParser(pydantic_object=self.spec.output_model)
 
-        # get the input schema as JSON
-        input_schema = get_clean_schema(ai_function_spec.input_model)
-        output_schema = get_clean_schema(ai_function_spec.output_model)
-
-        update_json_schema_hyperparameters(
-            input_schema,
-            prompt_hyperparameter("input_schema") @ get_json_schema_hyperparameters(input_schema),
-        )
+        # get the input adn output schema as JSON dict
+        schema = get_call_schema(self.spec.input_model, self.spec.output_model)
 
         update_json_schema_hyperparameters(
-            output_schema,
-            prompt_hyperparameter("output_schema") @ get_json_schema_hyperparameters(output_schema),
+            schema,
+            prompt_hyperparameter("schema") @ get_json_schema_hyperparameters(schema),
         )
 
         # create the prompt
         prompt = (
-            f"{prompt_hyperparameter('docstring') @ ai_function_spec.docstring}\n\n"
-            "The inputs are formatted as JSON using the following schema:\n"
-            f"{json.dumps(input_schema, indent=1)}\n"
+            "{docstring}\n"
             "\n"
-            f"{PYDANTIC_FORMAT_INSTRUCTIONS.format(schema=json.dumps(output_schema, indent=1))}"
+            "The input is formatted as a JSON interface of Inputs that conforms to the JSON schema below, "
+            "and the output should be formatted as a JSON instance of Outputs that conforms to the JSON "
+            "schema below.\n"
+            "\n"
+            'As an example, for the schema {{"properties": {{"foo": {{"title": "Foo", "description": "a list of '
+            'strings", "type": "array", "items": {{"type": "string"}}}}}}, "required": ["foo"]}}}} the object {{'
+            '"foo": ["bar", "baz"]}} is a well-formatted instance of the schema. The object {{"properties": {{"foo": '
+            '["bar", "baz"]}}}} is not well-formatted.\n'
+            "\n"
+            "Here is the schema:\n"
+            "```\n"
+            "{schema}\n"
+            "```\n"
             "\n"
             "Now output the results for the following inputs:\n"
-            f"{inputs.json(indent=1)}"
-        )
+            "```\n"
+            "{inputs}\n"
+            "```\n"
+        ).format(docstring=self.spec.docstring, schema=json.dumps(schema), inputs=inputs.json())
 
         # get the response
         num_retries = prompt_hyperparameter("num_retries_on_parser_failure") @ 3
@@ -261,12 +310,15 @@ def ai_function(f) -> ProtocolAIFunction:
                 raise OutputParserException(f"Failed to parse the output after {num_retries} retries.")
         elif isinstance(language_model_or_chat_chain, BaseChatModel | BaseLLM):
             new_prompt = prompt
+            output = ""
             for _ in range(num_retries):
                 prompt = new_prompt
                 if isinstance(language_model_or_chat_chain, BaseChatModel):
                     output = language_model_or_chat_chain.call_as_llm(prompt)
                 elif isinstance(language_model_or_chat_chain, BaseLLM):
                     output = language_model_or_chat_chain(prompt)
+                else:
+                    raise ValueError("The language model or chat chain must be provided.")
 
                 try:
                     parsed_output = parser.parse(output)
@@ -287,7 +339,33 @@ def ai_function(f) -> ProtocolAIFunction:
         else:
             raise ValueError("The language model or chat chain must be provided.")
 
-        return parsed_output.result  # type: ignore
+        return parsed_output.return_value  # type: ignore
 
-    ai_executor.ai_function_spec = ai_function_spec  # type: ignore
-    return ai_executor  # type: ignore
+
+def ai_function(f: typing.Callable[P, T]) -> AIFunction[P, T]:
+    """
+    Decorator to wrap a function with a chat model.
+
+    f is a function to a dataclass or Pydantic model.
+
+    The docstring of the function provides instructions for the model.
+    """
+    if isinstance(f, classmethod):
+        return classmethod(ai_function(f.__func__))
+    elif isinstance(f, staticmethod):
+        return staticmethod(ai_function(f.__func__))
+    elif isinstance(f, property):
+        return property(ai_function(f.fget), doc=f.__doc__)
+    elif isinstance(f, types.MethodType):
+        return types.MethodType(ai_function(f.__func__), f.__self__)
+    elif hasattr(f, "__wrapped__"):
+        return ai_function(f.__wrapped__)
+    elif isinstance(f, AIFunction):
+        return f
+    elif not callable(f):
+        raise ValueError(f"Cannot decorate {f} with llm_strategy.")
+
+    specific_ai_function: AIFunction = track_execution(
+        functools.wraps(f, updated=())(AIFunction(spec=AIFunctionSpec.from_function(f)))
+    )  # type: ignore
+    return specific_ai_function

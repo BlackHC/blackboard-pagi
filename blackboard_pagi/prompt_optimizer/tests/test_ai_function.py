@@ -87,7 +87,7 @@ def test_ai_function_spec_from_function():
     assert ai_function_spec.docstring == "Test docstring."
     assert ai_function_spec.signature == inspect.signature(f)
     assert ai_function_spec.input_model.schema() == create_model("FInputs", a=(str, ...), b=(int, 1)).schema()
-    assert ai_function_spec.output_model.schema() == create_model("FOutput", result=(str, ...)).schema()
+    assert ai_function_spec.output_model.schema() == create_model("FOutput", return_value=(str, ...)).schema()
 
 
 def test_ai_function_first_param():
@@ -219,24 +219,54 @@ def test_ai_function():
     fake_llm = FakeLLM(
         texts=[
             'Add two numbers.\n'
+            '\n'
             'The inputs are formatted as JSON using the following schema:\n'
-            '{"properties": {"a": {"title": "A", "type": "integer"}, "b": {"title": "B", "type": "integer"}}, '
-            '"required": ["a", "b"]}\n'
+            '{\n'
+            ' "properties": {\n'
+            '  "a": {\n'
+            '   "title": "A",\n'
+            '   "type": "integer"\n'
+            '  },\n'
+            '  "b": {\n'
+            '   "title": "B",\n'
+            '   "type": "integer"\n'
+            '  }\n'
+            ' },\n'
+            ' "required": [\n'
+            '  "a",\n'
+            '  "b"\n'
+            ' ]\n'
+            '}\n'
             '\n'
             'The output should be formatted as a JSON instance that conforms to the JSON schema below.\n'
             '\n'
-            'As an example, for the schema {"properties": {"foo": {"title": "Foo", "description": "a list of strings", '
-            '"type": "array", "items": {"type": "string"}}}, "required": ["foo"]}}\n'
-            'the object {"foo": ["bar", "baz"]} is a well-formatted instance of the schema. The object {"properties": '
-            '{"foo": ["bar", "baz"]}} is not well-formatted.\n'
+            'As an example, for the schema {"properties": {"foo": {"title": "Foo", "description": "a list of '
+            'strings", "type": "array", "items": {"type": "string"}}}, "required": ["foo"]}}\nthe object {"foo": ['
+            '"bar", "baz"]} is a well-formatted instance of the schema. The object {"properties": {"foo": ["bar", '
+            '"baz"]}} is not well-formatted.\n '
             '\n'
             'Here is the output schema:\n'
             '```\n'
-            '{"properties": {"result": {"title": "Result", "type": "integer"}}, "required": ["result"]}\n'
+            '{\n'
+            ' "properties": {\n'
+            '  "return_value": {\n'
+            '   "title": "Return Value",\n'
+            '   "type": "integer"\n'
+            '  }\n'
+            ' },\n'
+            ' "required": [\n'
+            '  "return_value"\n'
+            ' ]\n'
+            '}\n'
             '```\n'
             'Now output the results for the following inputs:\n'
-            '{"a": 1, "b": 2}'
-            '{"result": 3}'
+            '```\n'
+            '{\n'
+            ' "a": 1,\n'
+            ' "b": 2\n'
+            '}\n'
+            '```\n'
+            '{"return_value": 3}'
         ]
     )
 
