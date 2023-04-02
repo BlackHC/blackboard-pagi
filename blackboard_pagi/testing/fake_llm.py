@@ -64,9 +64,7 @@ class FakeLLM(LLM, BaseModel):
 
         # If no queries are provided, print the code to update the query
         code_snippet = (
-            "# Add the following to the queries dict:\n\n"
-            + "\n".join(map(repr, prompt.splitlines(True)))
-            + "\n# TODO: Append the correct response here"
+            f"# Add the following to the queries list:\n\n{repr(prompt)}\n# TODO: Append the correct " f"response here"
         )
         print(code_snippet)
         raise NotImplementedError("No query provided. Add the following to the queries dict:\n\n" + code_snippet)

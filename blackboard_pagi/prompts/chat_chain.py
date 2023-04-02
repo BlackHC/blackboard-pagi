@@ -3,7 +3,7 @@ import typing
 from dataclasses import dataclass
 from typing import Tuple
 
-from langchain.chat_models import ChatOpenAI
+from langchain.chat_models.base import BaseChatModel
 from langchain.output_parsers import PydanticOutputParser
 from langchain.schema import BaseMessage, HumanMessage
 from pydantic import create_model
@@ -13,7 +13,7 @@ T = typing.TypeVar("T")
 
 @dataclass
 class ChatChain:
-    chat_model: ChatOpenAI
+    chat_model: BaseChatModel
     messages: list[BaseMessage]
 
     @property

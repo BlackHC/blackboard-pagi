@@ -1,6 +1,8 @@
 import dataclasses
 import functools
+import types
 import typing
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -11,7 +13,9 @@ from langchain.schema import BaseMessage, ChatMessage, HumanMessage, LLMResult, 
 from pydantic import create_model
 
 from blackboard_pagi.prompts import chat_chain
-from blackboard_pagi.prompts.chat_chain import T
+
+T = typing.TypeVar("T")
+P = typing.ParamSpec("P")
 
 
 @dataclass
@@ -129,7 +133,13 @@ class WrappedChatModelAsLLM(BaseLLM):
         return self.inner_chat_model.__repr_name__()
 
 
-class ProtocolCallableWPromptHyperparams(typing.Protocol):
+@dataclass
+class TrackedFunction(typing.Callable[P, T], typing.Generic[P, T]):  # type: ignore
+    """
+    A callable that can be called with a chat model.
+    """
+
+    __wrapped__: typing.Callable[P, T]
     hyperparameters: dict[str | int, object]
     all_hyperparameters: dict[str, dict[str | int, object]]
     tracked_chat_chains: list[dict]
@@ -137,55 +147,70 @@ class ProtocolCallableWPromptHyperparams(typing.Protocol):
     tracked_prompts: dict[str, str]
     all_prompts: dict[str, str]
 
-    def __call__(self, *args, **kwargs):
-        pass
+    @staticmethod
+    def from_function(f: typing.Callable[P, T]):
+        tracked_function: TrackedFunction = functools.wraps(f)(
+            TrackedFunction(
+                f,
+                hyperparameters={},
+                all_hyperparameters=defaultdict(dict),
+                tracked_chat_chains=[],
+                all_chat_chains=[],
+                tracked_prompts={},
+                all_prompts={},
+            )
+        )
 
+        return tracked_function
 
-def track_execution(f) -> ProtocolCallableWPromptHyperparams:
-    @functools.wraps(f)
-    def decorator(*args, **kwargs):
+    def __get__(self, instance: object, owner: type | None = None) -> typing.Callable:
+        """Support instance methods."""
+        if instance is None:
+            return self
+
+        # Bind self to instance as MethodType
+        return types.MethodType(self, instance)
+
+    def __getattr__(self, item):
+        return getattr(self.__wrapped__, item)
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
         global current_tracked_state
         old_tracker_state = current_tracked_state
 
         try:
-            decorator.all_hyperparameters[f.__qualname__] = decorator.hyperparameters
+            self.all_hyperparameters[self.__qualname__] = self.hyperparameters
             current_tracked_state = TrackedState(
-                hyperparameters=decorator.hyperparameters,
-                all_hyperparameters=decorator.all_hyperparameters,
+                hyperparameters=self.hyperparameters,
+                all_hyperparameters=self.all_hyperparameters,
             )
-            result = f(*args, **kwargs)
-            if decorator.all_hyperparameters[f.__qualname__] == {}:
-                del decorator.all_hyperparameters[f.__qualname__]
+            result = self.__wrapped__(*args, **kwargs)
+            if self.all_hyperparameters[self.__qualname__] == {}:
+                del self.all_hyperparameters[self.__qualname__]
             if old_tracker_state is not None:
                 old_tracker_state.all_hyperparameters.update(current_tracked_state.all_hyperparameters)
             else:
-                decorator.all_chat_chains = [
+                self.all_chat_chains = [
                     chain.get_compact_subtree_dict(include_all=True)
                     for chain in current_tracked_state.all_chat_chains.values()
                 ]
-                decorator.tracked_chat_chains = [
+                self.tracked_chat_chains = [
                     chain.get_compact_subtree_dict(include_all=False)
                     for chain in current_tracked_state.tracked_chat_chains.values()
                     if chain.include_in_record
                 ]
-                decorator.tracked_prompts = current_tracked_state.tracked_prompts
-                decorator.all_prompts = current_tracked_state.all_prompts
+                self.tracked_prompts = current_tracked_state.tracked_prompts
+                self.all_prompts = current_tracked_state.all_prompts
 
-            decorator.all_hyperparameters = current_tracked_state.all_hyperparameters
+            self.all_hyperparameters = current_tracked_state.all_hyperparameters
         finally:
             current_tracked_state = old_tracker_state
 
         return result
 
-    # ignore attr-defined from mypy
-    decorator.hyperparameters = {}  # type: ignore
-    decorator.all_hyperparameters = {f.__qualname__: decorator.hyperparameters}  # type: ignore
-    decorator.all_chat_chains = []  # type: ignore
-    decorator.tracked_chat_chains = []  # type: ignore
-    decorator.tracked_prompts = {}  # type: ignore
-    decorator.all_prompts = {}  # type: ignore
 
-    return decorator  # type: ignore
+def track_execution(f: typing.Callable[P, T]) -> TrackedFunction[P, T]:
+    return TrackedFunction.from_function(f)
 
 
 @dataclass
@@ -328,4 +353,4 @@ class ChatChain(chat_chain.ChatChain):
         return {}
 
 
-__all__ = ["prompt_hyperparameter", "track_execution", "ProtocolCallableWPromptHyperparams", "ChatChain"]
+__all__ = ["prompt_hyperparameter", "track_execution", "TrackedFunction", "ChatChain"]

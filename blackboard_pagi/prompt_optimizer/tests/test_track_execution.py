@@ -328,6 +328,6 @@ def test_chat_chain_structured_query_retry_fail():
         assert result == "1"
         assert len(new_chain.get_full_message_chain()) == 4
 
-    ChatChain.structured_query.hyperparameters['num_retries'] = 0
+    ChatChain.structured_query.hyperparameters['num_retries_on_parser_failure'] = 0
     with pytest.raises(OutputParserException, match=re.escape("Failed to parse output")):
         f()

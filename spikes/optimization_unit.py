@@ -9,13 +9,11 @@ import langchain
 from langchain import OpenAI
 from langchain.cache import SQLiteCache
 from langchain.chat_models.base import BaseChatModel
-from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
-from pydantic.dataclasses import dataclass
 from pydantic.generics import GenericModel
 
 from blackboard_pagi.cached_chat_model import CachedChatOpenAI
-from blackboard_pagi.prompt_optimizer.ai_function import AIFunctionSpec, ai_function
+from blackboard_pagi.prompt_optimizer.llm_function import LLMFunctionSpec, llm_function
 from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
 from blackboard_pagi.prompts.chat_chain import ChatChain as UntrackedChatChain
 
@@ -48,7 +46,7 @@ class TaskRun(GenericModel, Generic[TaskParameters, TaskResults]):
     )
     all_chat_chains: list[dict] = Field(..., description="The chat chains from the task execution.")
     all_prompts: dict[str, str] = Field(..., description="The prompts and outputs from the task execution.")
-    results: TaskResults = Field(..., description="The results of the task.")
+    return_value: TaskResults = Field(..., description="The results of the task.")
 
 
 class TaskReflection(BaseModel):
@@ -130,7 +128,7 @@ class OptimizationStep(GenericModel, Generic[TaskParameters, TaskResults]):
     best_hyperparameters: dict = Field(..., description="The best hyperparameters we have found so far.")
 
 
-@ai_function
+@llm_function
 def reflect_on_task_run(language_model, task_run: TaskRun[TaskParameters, TaskResults]) -> TaskReflection:
     """
     Reflect on the task run.
@@ -138,7 +136,7 @@ def reflect_on_task_run(language_model, task_run: TaskRun[TaskParameters, TaskRe
     raise NotImplementedError()
 
 
-@ai_function
+@llm_function
 def summarize_optimization_info(
     language_model, optimization_info: OptimizationInfo[TaskParameters, TaskResults]
 ) -> str:
@@ -150,7 +148,7 @@ def summarize_optimization_info(
     raise NotImplementedError()
 
 
-@ai_function
+@llm_function
 def suggest_next_optimization_step(
     language_model, optimization_info: OptimizationInfo[TaskParameters, TaskResults]
 ) -> OptimizationStep[TaskParameters, TaskResults]:
@@ -160,7 +158,7 @@ def suggest_next_optimization_step(
     raise NotImplementedError()
 
 
-@ai_function
+@llm_function
 def probability_for_improvement(
     language_model, optimization_info: OptimizationInfo[TaskParameters, TaskResults]
 ) -> typing.Annotated[
@@ -180,7 +178,7 @@ def probability_for_improvement(
 def capture_task_run(
     chat_model,
     task_executor,
-    ai_function_spec: AIFunctionSpec,
+    llm_function_spec: LLMFunctionSpec,
     task_parameters: TaskParameters,
     all_hyperparameters: dict,
 ) -> TaskRun[TaskParameters, TaskResults]:
@@ -188,14 +186,14 @@ def capture_task_run(
     Capture the task run.
     """
     prompt_hyperparameter.merge(task_executor, all_hyperparameters)
-    results = task_executor(chat_model, **task_parameters.dict())
-    results = ai_function_spec.output_model(result=results)
-    return TaskRun[ai_function_spec.input_model, ai_function_spec.output_model](
+    return_value = task_executor(chat_model, **task_parameters.dict())
+    return_value = llm_function_spec.output_model(return_value=return_value)
+    return TaskRun[llm_function_spec.input_model, llm_function_spec.output_model](
         task_parameters=task_parameters,
         hyperparameters=all_hyperparameters,
         all_chat_chains=task_executor.all_chat_chains,
         all_prompts=task_executor.all_prompts,
-        results=results,
+        return_value=return_value,
     )
 
 
@@ -203,8 +201,8 @@ def capture_task_run(
 def optimize_hyperparameters(
     chat_model: BaseChatModel,
     task_executor,
-    ai_function_spec: AIFunctionSpec,
-    seed_task_runs: TaskRun[TaskParameters, TaskResults],
+    llm_function_spec: LLMFunctionSpec,
+    seed_task_runs: list[TaskRun[TaskParameters, TaskResults]],
 ) -> OptimizationStep[TaskParameters, TaskResults]:
     """
     Optimize the hyperparameters.
@@ -213,20 +211,21 @@ def optimize_hyperparameters(
     root_chain = ChatChain(chat_model, [])
 
     task_infos = [
-        TaskInfo[ai_function_spec.input_model, ai_function_spec.output_model](
+        TaskInfo[llm_function_spec.input_model, llm_function_spec.output_model](
             task_parameters=task_run.task_parameters,
             hyperparameters=task_run.hyperparameters,
-            results=task_run.results,
+            results=task_run.return_value,
             reflection=reflect_on_task_run(root_chain, task_run),
         )
         for task_run in seed_task_runs
     ]
 
-    optimization_info = OptimizationInfo[ai_function_spec.input_model, ai_function_spec.output_model](
+    optimization_info = OptimizationInfo[llm_function_spec.input_model, llm_function_spec.output_model](
         task_infos=task_infos,
         best_hyperparameters=task_infos[0].hyperparameters,
     )
 
+    optimization_step = None
     for _ in range(3):
         optimization_step = suggest_next_optimization_step(root_chain, optimization_info)
 
@@ -235,20 +234,21 @@ def optimize_hyperparameters(
         for task_parameters in optimization_step.task_parameters_suggestions:
             for hyperparameters in optimization_step.hyperparameter_suggestions:
                 task_run = capture_task_run(
-                    root_chain, task_executor, ai_function_spec, task_parameters, hyperparameters
+                    root_chain, task_executor, llm_function_spec, task_parameters, hyperparameters
                 )
-                task_info = TaskInfo[ai_function_spec.input_model, ai_function_spec.output_model](
+                task_info = TaskInfo[llm_function_spec.input_model, llm_function_spec.output_model](
                     run=task_run, reflection=reflect_on_task_run(root_chain, task_run)
                 )
                 optimization_info.task_infos.append(task_info)
 
         if len(optimization_info.task_infos) >= 20:
             optimization_info.older_task_summary = summarize_optimization_info(
-                OptimizationInfo[ai_function_spec.input_model, ai_function_spec.output_model](
+                root_chain,
+                OptimizationInfo[llm_function_spec.input_model, llm_function_spec.output_model](
                     older_task_summary=optimization_info.older_task_summary,
                     task_infos=optimization_info.task_infos[:-10],
                     best_hyperparameters=optimization_step.best_hyperparameters,
-                )
+                ),
             )
             optimization_info.task_infos = optimization_info.task_infos[-10:]
 
@@ -258,7 +258,7 @@ def optimize_hyperparameters(
     return optimization_step
 
 
-@ai_function
+@llm_function
 def write_essay(chat_model, essay_topic: str = Field(..., description="The essay topic.")) -> str:
     """
     Write an essay at the level of an Oxford undergraduate student. Please write about 500 words.
@@ -267,7 +267,7 @@ def write_essay(chat_model, essay_topic: str = Field(..., description="The essay
     raise NotImplementedError()
 
 
-@ai_function
+@llm_function
 def create_essay_topics(
     chat_model,
     domain: str = Field(..., description="The domain or general area of the essay topic"),
@@ -295,7 +295,7 @@ essay_topics = [
 
 #%%
 
-spec = create_essay_topics.ai_function_spec
+spec = create_essay_topics.spec
 
 seed_task_runs = [
     capture_task_run(
