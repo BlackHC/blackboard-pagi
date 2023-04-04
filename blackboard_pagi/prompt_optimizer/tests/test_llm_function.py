@@ -516,15 +516,16 @@ def test_llm_function():
 
     fake_llm = FakeLLM(
         texts=[
-            'Add two numbers.\n\nThe input is formatted as a JSON interface of Inputs that conforms to the JSON '
-            'schema below, and the output should be formatted as a JSON instance of Outputs that conforms to the JSON '
-            'schema below.\n\nAs an example, for the schema {"properties": {"foo": {"title": "Foo", "description": "a '
-            'list of strings", "type": "array", "items": {"type": "string"}}}, "required": ["foo"]}} the object {'
-            '"foo": ["bar", "baz"]} is a well-formatted instance of the schema. The object {"properties": {"foo": ['
-            '"bar", "baz"]}} is not well-formatted.\n\nHere is the schema:\n```\n{"Inputs": {"properties": {"a": {'
-            '"title": "A", "type": "integer"}, "b": {"title": "B", "type": "integer"}}, "required": ["a", "b"]}, '
-            '"Outputs": {"properties": {"return_value": {"title": "Return Value", "type": "integer"}}, "required": ['
-            '"return_value"]}}\n```\n\nNow output the results for the following inputs:\n```\n{"a": 1, "b": 2}\n```\n'
+            'Add two numbers.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON '
+            'schemas below.\n\nAs an example, for the schema {"properties": {"foo": {"description": "a list of '
+            'strings", "type": "array", "items": {"type": "string"}}}, "required": ["foo"]}} the object {"foo": ['
+            '"bar", "baz"]} is a well-formatted instance of the schema. The object {"properties": {"foo": ["bar", '
+            '"baz"]}} is not well-formatted.\n\nHere is the schema for additional date types:\n```\n{}\n```\n\nHere '
+            'is the input schema:\n```\n{\n "properties": {\n  "a": {\n   "type": "integer"\n  },\n  "b": {\n   '
+            '"type": "integer"\n  }\n },\n "required": [\n  "a",\n  "b"\n ]\n}\n```\n\nHere is the output '
+            'schema:\n```\n{\n "properties": {\n  "return_value": {\n   "type": "integer"\n  }\n },\n "required": [\n '
+            ' "return_value"\n ]\n}\n```\nNow output the results for the following inputs:\n```\n{\n "a": 1,'
+            '\n "b": 2\n}\n```\n '
             '{"return_value": 3}'
         ]
     )

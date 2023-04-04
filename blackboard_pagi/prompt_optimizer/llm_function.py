@@ -271,10 +271,8 @@ class LLMFunctionSpec:
             if not issubclass(first_parameter.annotation, BaseLanguageModel | ChatChain):
                 raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
 
-        bound_arguments = LLMFunctionSpec.bind_with_pydantic_defaults(args, kwargs, language_model_or_chain, signature)
-
         # create a pydantic model from the parameters
-        parameter_dict = LLMFunctionSpec.get_parameter_definitions(parameters_items[1:], bound_arguments.arguments)
+        parameter_dict = LLMFunctionSpec.parameter_items_to_field_tuple(parameters_items[1:])
 
         # get the return type
         return_type = signature.return_annotation
@@ -291,12 +289,23 @@ class LLMFunctionSpec:
         return_type = return_info[0]
 
         # resolve generic types
+        bound_arguments = LLMFunctionSpec.bind(args, kwargs, language_model_or_chain, signature)
         generic_type_map = LLMFunctionSpec.resolve_generic_types(parameters_items[1:], bound_arguments.arguments)
         return_type = LLMFunctionSpec.resolve_type(return_type, generic_type_map)
         return_info = (return_type, return_info[1])
 
         # turn function name into a class name
         class_name = string.capwords(f.__name__, sep="_").replace("_", "")
+
+        # update parameter_dict types with bound_arguments
+        # this ensures that serialize the actual types
+        # might not be optimal because the language model won't be aware of original types
+        for parameter_name in parameter_dict:
+            if parameter_name in bound_arguments.arguments:
+                parameter_dict[parameter_name] = (
+                    type(bound_arguments.arguments[parameter_name]),
+                    parameter_dict[parameter_name][1],
+                )
 
         # create the input model
         input_model = create_model(f"{class_name}Inputs", __module__=f.__module__, **parameter_dict)
@@ -314,11 +323,9 @@ class LLMFunctionSpec:
         )
 
     @staticmethod
-    def get_parameter_definitions(parameters_items: list[tuple[str, inspect.Parameter]], arguments: dict[str, object]):
+    def parameter_items_to_field_tuple(parameters_items: list[tuple[str, inspect.Parameter]]):
         """
         Get the parameter definitions for a function call from the parameters and arguments.
-
-        Performs type checking and raises a ValueError if the type of an argument does not match the type annotation.
         """
         parameter_dict: dict = {}
         for parameter_name, parameter in parameters_items:
@@ -327,18 +334,10 @@ class LLMFunctionSpec:
             if annotation is type:
                 annotation = TyperWrapper
 
-            argument = arguments[parameter_name]
-
-            if annotation is inspect.Parameter.empty:
-                annotation = type(argument)
-
             if parameter.default is inspect.Parameter.empty:
                 parameter_dict[parameter_name] = (annotation, ...)
             else:
-                parameter_dict[parameter_name] = (
-                    annotation,
-                    parameter.default,
-                )
+                parameter_dict[parameter_name] = (annotation, parameter.default)
         return parameter_dict
 
     @staticmethod
@@ -428,7 +427,10 @@ class LLMFunctionSpec:
         return None
 
     @staticmethod
-    def bind_with_pydantic_defaults(args, kwargs, language_model_or_chain, signature):
+    def bind(args, kwargs, language_model_or_chain, signature):
+        """
+        Bind function taking into account Field definitions and defaults.
+        """
         # resolve parameter defaults to FieldInfo.default if the parameter is a field
         signature_fixed_defaults = signature.replace(
             parameters=[
