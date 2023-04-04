@@ -26,18 +26,17 @@ def test_get_json_schema_hyperparameters():
         "title": "test",
         "description": "test",
         "properties": {
-            "test": {"title": "test", "description": "test", "type": "string"},
-            "test2": {"title": "test", "description": "test", "type": "string"},
+            "test": {"description": "test", "type": "string"},
+            "test2": {"description": "test", "type": "string"},
         },
         "type": "object",
         "required": ["test", "test2"],
     }
     assert get_json_schema_hyperparameters(schema) == {
-        "title": "test",
         "description": "test",
         "properties": {
-            "test": {"title": "test", "description": "test"},
-            "test2": {"title": "test", "description": "test"},
+            "test": {"description": "test"},
+            "test2": {"description": "test"},
         },
     }
 
@@ -221,8 +220,8 @@ def test_llm_function_spec_from_call():
     llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), ("",), {})
     assert llm_function_spec.docstring == "Test docstring."
     assert llm_function_spec.signature == inspect.signature(f)
-    assert llm_function_spec.input_model.schema() == create_model("Inputs", a=(str, ...), b=(int, 1)).schema()
-    assert llm_function_spec.output_model.schema() == create_model("Outputs", return_value=(str, ...)).schema()
+    assert llm_function_spec.input_model.schema() == create_model("FInputs", a=(str, ...), b=(int, 1)).schema()
+    assert llm_function_spec.output_model.schema() == create_model("FOutputs", return_value=(str, ...)).schema()
 
 
 def test_llm_function_from_call_first_param():
@@ -236,7 +235,7 @@ def test_llm_function_from_call_first_param():
             'b': {'title': 'B', 'type': 'integer', 'default': 1},
         },
         'required': ['a'],
-        'title': 'Inputs',
+        'title': 'FInputs',
         'type': 'object',
     }
 
@@ -250,7 +249,7 @@ def test_llm_function_from_call_first_param():
             'b': {'title': 'B', 'type': 'integer', 'default': 1},
         },
         'required': ['a'],
-        'title': 'Inputs',
+        'title': 'GInputs',
         'type': 'object',
     }
 
@@ -264,7 +263,7 @@ def test_llm_function_from_call_first_param():
             'b': {'title': 'B', 'type': 'integer', 'default': 1},
         },
         'required': ['a'],
-        'title': 'Inputs',
+        'title': 'HInputs',
         'type': 'object',
     }
 
@@ -286,7 +285,17 @@ def test_llm_function_spec_from_call_with_field():
 
     llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), ("",), {})
 
-    assert llm_function_spec.input_model.schema() == create_model("Inputs", a=(str, ...), b=(int, 3)).schema()
+    assert llm_function_spec.input_model.schema() == create_model("FInputs", a=(str, ...), b=(int, 3)).schema()
+
+
+def test_llm_function_spec_from_call_with_missing_default():
+    # Use Pydantic's Field to specify a description.
+    def f(llm: BaseLLM, a: str, b: int = Field(..., description="test")) -> str:
+        """Test docstring."""
+        raise NotImplementedError
+
+    with pytest.raises(TypeError, match=re.escape("missing a required argument: 'b'")):
+        LLMFunctionSpec.from_call(f, FakeLLM(), ("",), {})
 
 
 def test_llm_function_spec_from_call_with_field_description_no_default():
@@ -295,7 +304,7 @@ def test_llm_function_spec_from_call_with_field_description_no_default():
         """Test docstring."""
         raise NotImplementedError
 
-    llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), ("",), {})
+    llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), ("",), dict(b=1))
 
     assert llm_function_spec.input_model.schema() == {
         'properties': {
@@ -303,7 +312,7 @@ def test_llm_function_spec_from_call_with_field_description_no_default():
             'b': {'description': 'test', 'title': 'B', 'type': 'integer'},
         },
         'required': ['a', 'b'],
-        'title': 'Inputs',
+        'title': 'FInputs',
         'type': 'object',
     }
 
@@ -331,7 +340,7 @@ def test_llm_function_spec_from_call_no_parameter_annotation_but_default():
         raise NotImplementedError
 
     llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), (), {})
-    assert llm_function_spec.input_model.schema() == create_model("Inputs", a=(int, 1), b=(int, 1)).schema()
+    assert llm_function_spec.input_model.schema() == create_model("FInputs", a=(int, 1), b=(int, 1)).schema()
 
 
 def test_llm_function_spec_from_call_generic_input_outputs() -> None:
@@ -354,7 +363,21 @@ def test_llm_function_spec_from_call_generic_input_outputs() -> None:
     )
     assert (
         llm_function_spec.output_model.schema()
-        == create_model("Outputs", return_value=(GenericType2[int, str], ...)).schema()
+        == create_model("FOutputs", return_value=(GenericType2[int, str], ...)).schema()
+    )
+
+
+def test_llm_function_spec_from_call_generic_function() -> None:
+    T = typing.TypeVar("T")
+    S = typing.TypeVar("S")
+
+    def f(llm: BaseLLM, a: T, b: S) -> dict[T, S]:
+        """Test docstring."""
+        raise NotImplementedError
+
+    llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), (), dict(a=0, b=""))
+    assert (
+        llm_function_spec.output_model.schema() == create_model("FOutputs", return_value=(dict[int, str], ...)).schema()
     )
 
 
@@ -381,7 +404,7 @@ def test_llm_function_spec_from_call_generic_input_outputs_full_remap() -> None:
     )
     assert (
         llm_function_spec.output_model.schema()
-        == create_model("Outputs", return_value=(GenericType2[int, str], ...)).schema()
+        == create_model("FOutputs", return_value=(GenericType2[int, str], ...)).schema()
     )
 
 
@@ -412,7 +435,7 @@ def test_llm_function_spec_from_call_generic_input_outputs_multiple_remap() -> N
     )
     assert (
         llm_function_spec.output_model.schema()
-        == create_model("Outputs", return_value=(GenericType[int, str], ...)).schema()
+        == create_model("FOutputs", return_value=(GenericType[int, str], ...)).schema()
     )
 
 
@@ -465,6 +488,22 @@ def test_llm_function_spec_get_generic_type_map() -> None:
     assert LLMFunctionSpec.get_generic_type_map(GenericType[S, T][U, V][X, X]) == {T: X, S: X}  # type: ignore
     assert LLMFunctionSpec.get_generic_type_map(GenericType[U, U][X]) == {T: X, S: X}  # type: ignore
     assert LLMFunctionSpec.get_generic_type_map(GenericType[int, U][str]) == {T: int, S: str}  # type: ignore
+
+
+def test_llm_function_spec_resolve_generic_types() -> None:
+    T = typing.TypeVar("T")
+    S = typing.TypeVar("S")
+
+    def f(a: T, b: S) -> dict[T, S]:
+        """Test docstring."""
+        raise NotImplementedError
+
+    signature = inspect.signature(f)
+    parameter_items = list(signature.parameters.items())
+    assert LLMFunctionSpec.resolve_generic_types(parameter_items, dict(a=1, b="Hello")) == {
+        T: int,
+        S: str,
+    }
 
 
 def test_llm_function():

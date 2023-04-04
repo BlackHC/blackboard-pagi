@@ -1,26 +1,29 @@
 """
 Spike for a meta-loop that optimizes the prompt templates we use.
 """
+import functools
 import typing
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import Generic, TypeVar
 
 import langchain
 from langchain import OpenAI
 from langchain.cache import SQLiteCache
+from langchain.chat_models import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
 from blackboard_pagi.cached_chat_model import CachedChatOpenAI
-from blackboard_pagi.prompt_optimizer.llm_function import LLMFunctionSpec, llm_function
+from blackboard_pagi.prompt_optimizer.llm_function import LLMFunction, LLMFunctionSpec, llm_function
 from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
 from blackboard_pagi.prompts.chat_chain import ChatChain as UntrackedChatChain
 
 langchain.llm_cache = SQLiteCache(".self_optimization.langchain.db")
 
-# chat_model = CachedChatOpenAI(model_name="gpt-4", max_tokens=512)
-chat_model = CachedChatOpenAI(max_tokens=1024)
+chat_model = ChatOpenAI(model_name="gpt-4", max_tokens=1024, model_kwargs=dict(temperature=0.1))
+# chat_model = CachedChatOpenAI(max_tokens=1024)
 
 text_model = OpenAI(
     model_name="text-davinci-003",
@@ -113,6 +116,9 @@ class OptimizationStep(GenericModel, Generic[TaskParameters, TaskResults]):
     new task parameters we want to evaluate on given the previous experiments.
     """
 
+    best_hyperparameters: dict = Field(
+        ..., description="The best hyperparameters we have found so far given " "task_infos and history."
+    )
     suggestion: str = Field(
         ...,
         description="The suggestions for the next experiments. What could we try to change?"
@@ -120,12 +126,11 @@ class OptimizationStep(GenericModel, Generic[TaskParameters, TaskResults]):
         "step.",
     )
     task_parameters_suggestions: list[TaskParameters, TaskResults] = Field(
-        ..., description="The task parameters we want to try next.", min_items=1, max_items=4
+        ..., description="The task parameters we want to try next.", hint_min_items=1, hint_max_items=4
     )
     hyperparameter_suggestions: list[dict] = Field(
-        ..., description="The hyperparameters we want to try next.", min_items=1, max_items=2
+        ..., description="The hyperparameters we want to try next.", hint_min_items=1, hint_max_items=2
     )
-    best_hyperparameters: dict = Field(..., description="The best hyperparameters we have found so far.")
 
 
 @llm_function
@@ -175,10 +180,32 @@ def probability_for_improvement(
     raise NotImplementedError()
 
 
+@dataclass
+class CapturedFuncArgsKWArgs:
+    f: typing.Callable
+    args: tuple
+    kwargs: dict
+
+
+P = typing.ParamSpec("P")
+T = typing.TypeVar('T')
+
+
+class CaptureFuncArgsKWArgs:
+    def __matmul__(self, f: typing.Callable[P, T]) -> typing.Callable[P, CapturedFuncArgsKWArgs]:
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            return CapturedFuncArgsKWArgs(f=f, args=args, kwargs=kwargs)
+
+        return wrapper
+
+
+capture_func_args_kwargs = CaptureFuncArgsKWArgs()
+
+
 def capture_task_run(
     chat_model,
-    task_executor,
-    llm_function_spec: LLMFunctionSpec,
+    task_executor: LLMFunction,
     task_parameters: TaskParameters,
     all_hyperparameters: dict,
 ) -> TaskRun[TaskParameters, TaskResults]:
@@ -186,9 +213,9 @@ def capture_task_run(
     Capture the task run.
     """
     prompt_hyperparameter.merge(task_executor, all_hyperparameters)
+    llm_function_spec = task_executor.get_spec_from_inputs(task_parameters)
     return_value = task_executor(chat_model, **task_parameters.dict())
-    return_value = llm_function_spec.output_model(return_value=return_value)
-    return TaskRun[llm_function_spec.input_model, llm_function_spec.output_model](
+    return TaskRun[llm_function_spec.input_model, llm_function_spec.return_type](
         task_parameters=task_parameters,
         hyperparameters=all_hyperparameters,
         all_chat_chains=task_executor.all_chat_chains,
@@ -201,7 +228,6 @@ def capture_task_run(
 def optimize_hyperparameters(
     chat_model: BaseChatModel,
     task_executor,
-    llm_function_spec: LLMFunctionSpec,
     seed_task_runs: list[TaskRun[TaskParameters, TaskResults]],
 ) -> OptimizationStep[TaskParameters, TaskResults]:
     """
@@ -209,6 +235,8 @@ def optimize_hyperparameters(
     """
 
     root_chain = ChatChain(chat_model, [])
+
+    llm_function_spec = task_executor.get_spec_from_inputs(seed_task_runs[0].task_parameters)
 
     task_infos = [
         TaskInfo[llm_function_spec.input_model, llm_function_spec.output_model](
@@ -233,11 +261,12 @@ def optimize_hyperparameters(
 
         for task_parameters in optimization_step.task_parameters_suggestions:
             for hyperparameters in optimization_step.hyperparameter_suggestions:
-                task_run = capture_task_run(
-                    root_chain, task_executor, llm_function_spec, task_parameters, hyperparameters
-                )
+                task_run = capture_task_run(root_chain, task_executor, task_parameters, hyperparameters)
                 task_info = TaskInfo[llm_function_spec.input_model, llm_function_spec.output_model](
-                    run=task_run, reflection=reflect_on_task_run(root_chain, task_run)
+                    task_parameters=task_run.task_parameters,
+                    hyperparameters=task_run.hyperparameters,
+                    results=task_run.return_value,
+                    reflection=reflect_on_task_run(root_chain, task_run),
                 )
                 optimization_info.task_infos.append(task_info)
 
@@ -295,11 +324,12 @@ essay_topics = [
 
 #%%
 
-spec = create_essay_topics.spec
-
 seed_task_runs = [
     capture_task_run(
-        UntrackedChatChain(chat_model, []), create_essay_topics, spec, spec.input_model(domain="comedy", n=2), {}
+        UntrackedChatChain(chat_model, []),
+        create_essay_topics,
+        create_essay_topics.get_inputs(domain="comedy", n=2),
+        {},
     )
     for topic in essay_topics[:2]
 ]
@@ -312,4 +342,4 @@ for task_run in seed_task_runs:
 
 #%%
 
-optimization_step = optimize_hyperparameters(chat_model, create_essay_topics, spec, seed_task_runs)
+optimization_step = optimize_hyperparameters(chat_model, create_essay_topics, seed_task_runs)

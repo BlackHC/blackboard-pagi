@@ -2,25 +2,29 @@ import dis
 import functools
 import inspect
 import json
+import re
+import string
 import types
 import typing
 from copy import deepcopy
 from dataclasses import dataclass
 
 import pydantic
+import pydantic.schema
 import typing_extensions
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms import BaseLLM
-from langchain.output_parsers import PydanticOutputParser
 from langchain.schema import BaseLanguageModel, OutputParserException
-from pydantic import BaseModel, create_model, generics
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, ValidationError, create_model, generics
+from pydantic.fields import FieldInfo, Undefined
+from pydantic.generics import replace_types
 
 from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
 from blackboard_pagi.prompts.chat_chain import ChatChain as UntrackedChatChain
 
 T = typing.TypeVar("T")
 P = typing_extensions.ParamSpec("P")
+B = typing.TypeVar("B", bound=BaseModel)
 
 
 def get_json_schema_hyperparameters(schema: dict):
@@ -31,7 +35,7 @@ def get_json_schema_hyperparameters(schema: dict):
     """
     hyperparameters = {}
     for key, value in schema.items():
-        if key in ("title", "description"):
+        if key == "description":
             hyperparameters[key] = value
         elif isinstance(value, dict):
             sub_hyperparameters = get_json_schema_hyperparameters(value)
@@ -138,6 +142,7 @@ class LLMFunctionSpec:
     docstring: str
     input_model: typing.Type[BaseModel]
     output_model: typing.Type[BaseModel]
+    return_type: type
 
     def get_call_schema(self) -> dict:
         schema = pydantic.schema.schema([self.input_model, self.output_model])
@@ -147,7 +152,30 @@ class LLMFunctionSpec:
             value.pop("title")
             value.pop("type")
 
-        return definitions
+            for property in value.get("properties", {}).values():
+                if "title" in property:
+                    property.pop("title")
+
+        input_schema = definitions[self.input_model.__name__]
+        output_schema = definitions[self.output_model.__name__]
+        del definitions[self.input_model.__name__]
+        del definitions[self.output_model.__name__]
+
+        schema = dict(
+            input_schema=input_schema,
+            output_schema=output_schema,
+            additional_definitions=definitions,
+        )
+        return schema
+
+    def get_inputs(self, *args: P.args, **kwargs: P.kwargs) -> BaseModel:
+        """Call the function and return the inputs."""
+        # bind the inputs to the signature
+        bound_arguments = self.signature.bind(None, *args, **kwargs)
+        # get the arguments
+        arguments = bound_arguments.arguments
+        inputs = self.input_model(**arguments)
+        return inputs
 
     @staticmethod
     def from_function(f: typing.Callable[P, T]) -> "LLMFunctionSpec":
@@ -216,6 +244,7 @@ class LLMFunctionSpec:
             signature=signature,
             input_model=input_model,
             output_model=output_model,
+            return_type=return_type,
         )
 
     @staticmethod
@@ -242,15 +271,10 @@ class LLMFunctionSpec:
             if not issubclass(first_parameter.annotation, BaseLanguageModel | ChatChain):
                 raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
 
-        # check that the first argument is an instance of BaseLanguageModel
-        # or a TrackedChatChain or UntrackedChatChain
-        if not isinstance(language_model_or_chain, BaseLanguageModel | ChatChain | UntrackedChatChain):
-            raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
-
         bound_arguments = LLMFunctionSpec.bind_with_pydantic_defaults(args, kwargs, language_model_or_chain, signature)
 
         # create a pydantic model from the parameters
-        parameter_dict = LLMFunctionSpec.get_parameter_definitions(parameters_items[1:], bound_arguments)
+        parameter_dict = LLMFunctionSpec.get_parameter_definitions(parameters_items[1:], bound_arguments.arguments)
 
         # get the return type
         return_type = signature.return_annotation
@@ -266,18 +290,19 @@ class LLMFunctionSpec:
 
         return_type = return_info[0]
 
-        # use the generic type map to resolve the return type if possible
-        if issubclass(return_type, generics.GenericModel):
-            # resolve generic types using pydantic's _assigned_parameters
-            generic_type_map = LLMFunctionSpec.resolve_generic_types(parameters_items[1:], bound_arguments)
-            return_type = LLMFunctionSpec.resolve_return_type(return_type, generic_type_map)
-            return_info = (return_type, return_info[1])
+        # resolve generic types
+        generic_type_map = LLMFunctionSpec.resolve_generic_types(parameters_items[1:], bound_arguments.arguments)
+        return_type = LLMFunctionSpec.resolve_type(return_type, generic_type_map)
+        return_info = (return_type, return_info[1])
+
+        # turn function name into a class name
+        class_name = string.capwords(f.__name__, sep="_").replace("_", "")
 
         # create the input model
-        input_model = create_model("Inputs", **parameter_dict)
+        input_model = create_model(f"{class_name}Inputs", __module__=f.__module__, **parameter_dict)
         input_model.update_forward_refs()
 
-        output_model = create_model("Outputs", return_value=return_info)
+        output_model = create_model(f"{class_name}Outputs", __module__=f.__module__, return_value=return_info)
         output_model.update_forward_refs()
 
         return LLMFunctionSpec(
@@ -285,10 +310,16 @@ class LLMFunctionSpec:
             signature=signature,
             input_model=input_model,
             output_model=output_model,
+            return_type=return_type,
         )
 
     @staticmethod
-    def get_parameter_definitions(parameters_items, bound_arguments):
+    def get_parameter_definitions(parameters_items: list[tuple[str, inspect.Parameter]], arguments: dict[str, object]):
+        """
+        Get the parameter definitions for a function call from the parameters and arguments.
+
+        Performs type checking and raises a ValueError if the type of an argument does not match the type annotation.
+        """
         parameter_dict: dict = {}
         for parameter_name, parameter in parameters_items:
             # every parameter must be annotated or have a default value
@@ -296,9 +327,9 @@ class LLMFunctionSpec:
             if annotation is type:
                 annotation = TyperWrapper
 
-            argument = bound_arguments.arguments[parameter_name]
-            # if the argument is a subtype of the annotation, use the argument's type
-            if annotation is inspect.Parameter.empty or isinstance(argument, annotation):
+            argument = arguments[parameter_name]
+
+            if annotation is inspect.Parameter.empty:
                 annotation = type(argument)
 
             if parameter.default is inspect.Parameter.empty:
@@ -311,30 +342,52 @@ class LLMFunctionSpec:
         return parameter_dict
 
     @staticmethod
-    def resolve_return_type(return_type, generic_type_map):
-        return_base_generic_type = LLMFunctionSpec.get_base_generic_type(return_type)
-        return_generic_parameter_type_map = LLMFunctionSpec.get_generic_type_map(return_type, return_base_generic_type)
-        # forward step on return type
-        resolved_generic_return_type_map = {
-            generic_type: generic_type_map.get(target_type, target_type)
-            for generic_type, target_type in return_generic_parameter_type_map.items()
-        }
-        resolved_return_tuple = tuple(
-            resolved_generic_return_type_map[generic_type] for generic_type in return_base_generic_type.__parameters__
-        )
-        return_type = return_base_generic_type[resolved_return_tuple]  # type: ignore
-        return return_type
+    def resolve_type(source_type: type, generic_type_map: dict[type, type]):
+        """
+        Resolve a type using the generic type map.
+
+        Supports Pydantic.GenericModel and typing.Generic.
+        """
+        if source_type in generic_type_map:
+            source_type = generic_type_map[source_type]
+
+        if isinstance(source_type, type) and issubclass(source_type, generics.GenericModel):
+            base_generic_type = LLMFunctionSpec.get_base_generic_type(source_type)
+            generic_parameter_type_map = LLMFunctionSpec.get_generic_type_map(source_type, base_generic_type)
+            # forward step using the generic type map
+            resolved_generic_type_map = {
+                generic_type: generic_type_map.get(target_type, target_type)
+                for generic_type, target_type in generic_parameter_type_map.items()
+            }
+            resolved_tuple = tuple(
+                resolved_generic_type_map[generic_type] for generic_type in base_generic_type.__parameters__
+            )
+            source_type = base_generic_type[resolved_tuple]  # type: ignore
+        else:
+            # we let Pydantic handle the rest
+            source_type = replace_types(source_type, generic_type_map)
+
+        return source_type
 
     @staticmethod
-    def resolve_generic_types(parameters_items, bound_arguments):
+    def resolve_generic_types(parameters_items: list[tuple[str, inspect.Parameter]], arguments: dict):
         generic_type_map: dict = {}
         for parameter_name, parameter in parameters_items:
-            if issubclass(parameter.annotation, generics.GenericModel):
+            annotation = parameter.annotation
+
+            # if the annotation is an Annotated type, get the type annotation
+            if typing.get_origin(annotation) is typing.Annotated:
+                annotation = typing.get_args(annotation)[0]
+
+            # if the annotation is a type var, resolve it into the generic type map
+            if isinstance(annotation, typing.TypeVar):
+                LLMFunctionSpec.add_resolved_type(generic_type_map, annotation, type(arguments[parameter_name]))
+            # if the annotation is a type, check if it is a generic type
+            elif issubclass(annotation, generics.GenericModel):
                 # check if the type is in generics._assigned_parameters
-                annotation = parameter.annotation
                 generic_parameters_type_map = LLMFunctionSpec.get_generic_type_map(annotation)
 
-                argument_type = type(bound_arguments.arguments[parameter_name])
+                argument_type = type(arguments[parameter_name])
                 generic_argument_type_map = LLMFunctionSpec.get_generic_type_map(argument_type)
 
                 assert list(generic_parameters_type_map.keys()) == list(generic_argument_type_map.keys())
@@ -345,22 +398,41 @@ class LLMFunctionSpec:
                     if generic_parameter_target not in annotation.__parameters__:
                         continue
                     resolved_type = generic_argument_type_map[generic_parameter]
-                    if generic_parameter_target in generic_type_map:
-                        if (previous_resolution := generic_type_map[generic_parameter_target]) is not resolved_type:
-                            raise ValueError(
-                                f"Cannot resolve generic type {generic_parameter_target}, conflicting "
-                                f"resolution: {previous_resolution} and {resolved_type}."
-                            )
-                    else:
-                        generic_type_map[generic_parameter_target] = resolved_type
+                    LLMFunctionSpec.add_resolved_type(generic_type_map, generic_parameter_target, resolved_type)
+
         return generic_type_map
+
+    @staticmethod
+    def add_resolved_type(generic_type_map, source_type, resolved_type):
+        """
+        Add a resolved type to the generic type map.
+        """
+        if source_type in generic_type_map:
+            # TODO: support finding the common base class?
+            if (previous_resolution := generic_type_map[source_type]) is not resolved_type:
+                raise ValueError(
+                    f"Cannot resolve generic type {source_type}, conflicting "
+                    f"resolution: {previous_resolution} and {resolved_type}."
+                )
+        else:
+            generic_type_map[source_type] = resolved_type
+
+    @staticmethod
+    def get_or_create_pydantic_default(field: FieldInfo):
+        if field.default is not Undefined:
+            if field.default is Ellipsis:
+                return inspect.Parameter.empty
+            return field.default
+        if field.default_factory is not None:
+            return field.default_factory()
+        return None
 
     @staticmethod
     def bind_with_pydantic_defaults(args, kwargs, language_model_or_chain, signature):
         # resolve parameter defaults to FieldInfo.default if the parameter is a field
         signature_fixed_defaults = signature.replace(
             parameters=[
-                parameter.replace(default=parameter.default.default or parameter.default.default_factory())
+                parameter.replace(default=LLMFunctionSpec.get_or_create_pydantic_default(parameter.default))
                 if isinstance(parameter.default, FieldInfo)
                 else parameter
                 for parameter in signature.parameters.values()
@@ -430,13 +502,14 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
     A callable that can be called with a chat model.
     """
 
-    _spec: LLMFunctionSpec | None = None
+    def get_spec_from_inputs(self, inputs: BaseModel) -> LLMFunctionSpec:
+        return LLMFunctionSpec.from_call(self, None, args=(), kwargs=inputs.dict())
 
-    @property
-    def spec(self) -> LLMFunctionSpec:
-        if self._spec is None:
-            self._spec = LLMFunctionSpec.from_function(self)
-        return self._spec
+    def get_spec_from_args(self, *args, **kwargs) -> LLMFunctionSpec:
+        return LLMFunctionSpec.from_call(self, None, args, kwargs)
+
+    def get_inputs(self, *args, **kwargs) -> BaseModel:
+        return self.get_spec_from_args(*args, **kwargs).get_inputs(*args, **kwargs)
 
     def __get__(self, instance: object, owner: type | None = None) -> typing.Callable:
         """Support instance methods."""
@@ -448,6 +521,12 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
 
     def __getattr__(self, item):
         return getattr(self.__wrapped__, item)
+
+    def explicit(
+        self, language_model_or_chat_chain: BaseLanguageModel | ChatChain | UntrackedChatChain, inputs: BaseModel
+    ):
+        """Call the function with explicit inputs."""
+        return self(language_model_or_chat_chain, **inputs.dict())
 
     def __call__(
         self,
@@ -461,16 +540,22 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
                 language_model_or_chat_chain.chat_model, language_model_or_chat_chain.messages
             )
 
+        # check that the first argument is an instance of BaseLanguageModel
+        # or a TrackedChatChain or UntrackedChatChain
+        if not isinstance(language_model_or_chat_chain, BaseLanguageModel | ChatChain):
+            raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
+
+        spec = LLMFunctionSpec.from_call(self, language_model_or_chat_chain, args, kwargs)
+
         # bind the inputs to the signature
-        bound_arguments = self.spec.signature.bind(language_model_or_chat_chain, *args, **kwargs)
+        bound_arguments = spec.signature.bind(language_model_or_chat_chain, *args, **kwargs)
         # get the arguments
         arguments = bound_arguments.arguments
-        inputs = self.spec.input_model(**arguments)
+        inputs = spec.input_model(**arguments)
 
         # get the input and output schema as JSON dict
-        schema = self.spec.get_call_schema()
-
-        print(schema)
+        schema = spec.get_call_schema()
+        # print(json.dumps(schema, indent=1))
 
         update_json_schema_hyperparameters(
             schema,
@@ -479,32 +564,47 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
 
         # create the prompt
         prompt = (
-            "{docstring}\n"
-            "\n"
-            "The input is formatted as a JSON interface of Inputs that conforms to the JSON schema below, "
-            "and the output should be formatted as a JSON instance of Outputs that conforms to the JSON "
-            "schema below.\n"
-            "\n"
-            'As an example, for the schema {{"properties": {{"foo": {{"title": "Foo", "description": "a list of '
-            'strings", "type": "array", "items": {{"type": "string"}}}}}}, "required": ["foo"]}}}} the object {{'
-            '"foo": ["bar", "baz"]}} is a well-formatted instance of the schema. The object {{"properties": {{"foo": '
-            '["bar", "baz"]}}}} is not well-formatted.\n'
-            "\n"
-            "Here is the schema:\n"
-            "```\n"
-            "{schema}\n"
-            "```\n"
-            "\n"
-            "Now output the results for the following inputs:\n"
-            "```\n"
-            "{inputs}\n"
-            "```\n"
-        ).format(docstring=self.spec.docstring, schema=json.dumps(schema), inputs=inputs.json())
+            prompt_hyperparameter("llm_function_prompt")
+            @ (
+                "{docstring}\n"
+                "\n"
+                "The input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n"
+                "\n"
+                'As an example, for the schema {{"properties": {{"foo": {{"description": "a list of '
+                'strings", "type": "array", "items": {{"type": "string"}}}}}}, "required": ["foo"]}}}} the object {{'
+                '"foo": ["bar", "baz"]}} is a well-formatted instance of the schema. The object {{"properties": {{'
+                '"foo": '
+                '["bar", "baz"]}}}} is not well-formatted.\n'
+                "\n"
+                "Here is the schema for additional date types:\n"
+                "```\n"
+                "{additional_definitions}\n"
+                "```\n"
+                "\n"
+                "Here is the input schema:\n"
+                "```\n"
+                "{input_schema}\n"
+                "```\n"
+                "\n"
+                "Here is the output schema:\n"
+                "```\n"
+                "{output_schema}\n"
+                "```\n"
+                "Now output the results for the following inputs:\n"
+                "```\n"
+                "{inputs}\n"
+                "```\n"
+            )
+        ).format(
+            docstring=spec.docstring,
+            additional_definitions=json.dumps(schema['additional_definitions'], indent=1),
+            input_schema=json.dumps(schema['input_schema'], indent=1),
+            output_schema=json.dumps(schema['output_schema'], indent=1),
+            inputs=inputs.json(indent=1),
+        )
 
         # get the response
         num_retries = prompt_hyperparameter("num_retries_on_parser_failure") @ 3
-
-        parser = PydanticOutputParser(pydantic_object=self.spec.output_model)
 
         if language_model_or_chat_chain is None:
             raise ValueError("The language model or chat chain must be provided.")
@@ -515,7 +615,7 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
                 prompt_hyperparameter.track_chain(chain)
 
                 try:
-                    parsed_output = parser.parse(output)
+                    parsed_output = self.parse(output, spec.output_model)
                     break
                 except OutputParserException as e:
                     prompt = (
@@ -538,7 +638,7 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
                     raise ValueError("The language model or chat chain must be provided.")
 
                 try:
-                    parsed_output = parser.parse(output)
+                    parsed_output = self.parse(output, spec.output_model)
                     break
                 except OutputParserException as e:
                     new_prompt = (
@@ -556,7 +656,25 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
         else:
             raise ValueError("The language model or chat chain must be provided.")
 
+        print(f"Input: {inputs.json(indent=1)}")
+        print(f"Output: {json.dumps(parsed_output.dict()['return_value'], indent=1)}")
+
         return parsed_output.return_value  # type: ignore
+
+    @staticmethod
+    def parse(text: str, output_model: type[B]) -> B:
+        try:
+            # Greedy search for 1st json candidate.
+            match = re.search(r"\{.*\}", text.strip(), re.MULTILINE | re.IGNORECASE | re.DOTALL)
+            json_str = ""
+            if match:
+                json_str = match.group()
+            json_object = json.loads(json_str)
+            return output_model.parse_obj(json_object)
+
+        except (json.JSONDecodeError, ValidationError) as e:
+            msg = f"Failed to parse the last reply. Expected: `{{\"return_value\": ...}}` Got: {e}"
+            raise OutputParserException(msg)
 
 
 def llm_function(f: typing.Callable[P, T]) -> LLMFunction[P, T]:
