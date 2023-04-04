@@ -19,7 +19,7 @@ from pydantic import BaseModel, ValidationError, create_model, generics
 from pydantic.fields import FieldInfo, Undefined
 from pydantic.generics import replace_types
 
-from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
+from blackboard_pagi.prompt_optimizer.track_execution_old import ChatChain, prompt_hyperparameter, track_execution
 from blackboard_pagi.prompts.chat_chain import ChatChain as UntrackedChatChain
 
 T = typing.TypeVar("T")

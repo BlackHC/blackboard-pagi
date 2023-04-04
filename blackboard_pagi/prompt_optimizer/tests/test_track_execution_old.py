@@ -3,7 +3,7 @@ import re
 import pytest
 from langchain.schema import AIMessage, HumanMessage, OutputParserException
 
-from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
+from blackboard_pagi.prompt_optimizer.track_execution_old import ChatChain, prompt_hyperparameter, track_execution
 from blackboard_pagi.testing.fake_chat_model import FakeChatModel
 
 

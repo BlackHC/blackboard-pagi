@@ -50,7 +50,6 @@ class FakeChatModel(BaseChatModel, BaseModel):
 
     @staticmethod
     def from_messages(messages_bag: Collection[list[BaseMessage]]):
-        # convert messages_bafg to messages_tuples_bag
         messages_tuples_bag = {tuple(dict_to_tuple(m) for m in messages_to_dict(messages)) for messages in messages_bag}
         return FakeChatModel(messages_tuples_bag=messages_tuples_bag)
 
@@ -98,4 +97,5 @@ class FakeChatModel(BaseChatModel, BaseModel):
         code_snippet = f"""# Add the following to the queries dict:
 {messages!r}, # TODO: Append the correct response here
 """
+        print(code_snippet)
         raise NotImplementedError("No query provided. Add the following to the queries dict:\n\n" + code_snippet)

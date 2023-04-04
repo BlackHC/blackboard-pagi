@@ -17,7 +17,7 @@ from pydantic.generics import GenericModel
 
 from blackboard_pagi.cached_chat_model import CachedChatOpenAI
 from blackboard_pagi.prompt_optimizer.llm_function import LLMFunction, LLMFunctionSpec, llm_function
-from blackboard_pagi.prompt_optimizer.track_execution import ChatChain, prompt_hyperparameter, track_execution
+from blackboard_pagi.prompt_optimizer.track_execution_old import ChatChain, prompt_hyperparameter, track_execution
 from blackboard_pagi.prompts.chat_chain import ChatChain as UntrackedChatChain
 
 langchain.llm_cache = SQLiteCache(".self_optimization.langchain.db")
