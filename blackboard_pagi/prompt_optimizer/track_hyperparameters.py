@@ -1,6 +1,7 @@
 import dataclasses
 import functools
 import string
+import types
 import typing
 import warnings
 from collections import defaultdict
@@ -290,16 +291,45 @@ class HyperparametersBuilder:
 _hyperparameters_builder: HyperparametersBuilder | None = None
 
 
-def track_hyperparameters(f: typing.Callable[P, T]) -> typing.Callable[P, T]:
-    @functools.wraps(f)
-    def wrapper(*args, **kwargs):
+@dataclass
+class TrackedFunction(typing.Callable[P, T], typing.Generic[P, T]):  # type: ignore
+    """
+    A callable that can be called with a chat model.
+    """
+
+    __wrapped__: typing.Callable[P, T]
+
+    @staticmethod
+    def from_function(f: typing.Callable[P, T]):
+        tracked_function: TrackedFunction = functools.wraps(f)(
+            TrackedFunction(
+                f,
+            )
+        )
+
+        return tracked_function
+
+    def __get__(self, instance: object, owner: type | None = None) -> typing.Callable:
+        """Support instance methods."""
+        if instance is None:
+            return self
+
+        # Bind self to instance as MethodType
+        return types.MethodType(self, instance)
+
+    def __getattr__(self, item):
+        return getattr(self.__wrapped__, item)
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
         if _hyperparameters_builder is None:
-            return f(*args, **kwargs)
+            return self.__wrapped__(*args, **kwargs)
 
-        with _hyperparameters_builder[f].context().scope():
-            return f(*args, **kwargs)
+        with _hyperparameters_builder[self].context().scope():
+            return self.__wrapped__(*args, **kwargs)
 
-    return wrapper
+
+def track_hyperparameters(f: typing.Callable[P, T]) -> typing.Callable[P, T]:
+    return TrackedFunction.from_function(f)
 
 
 @dataclass
@@ -315,7 +345,7 @@ class HyperparametersScope:
 
 
 @contextmanager
-def hyperparameter_scope(hyperparameters: BaseModel | None = None):
+def hyperparameters_scope(hyperparameters: BaseModel | None = None) -> typing.Iterator[HyperparametersScope]:
     scope = HyperparametersScope(hyperparameters)
     with scope():
         yield scope

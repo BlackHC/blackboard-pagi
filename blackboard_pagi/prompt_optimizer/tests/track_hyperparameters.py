@@ -2,7 +2,7 @@ import pytest
 
 from blackboard_pagi.prompt_optimizer.track_hyperparameters import (
     Hyperparameter,
-    hyperparameter_scope,
+    hyperparameters_scope,
     track_hyperparameters,
 )
 
@@ -16,7 +16,7 @@ def test_all():
     def g():
         return Hyperparameter() @ 2
 
-    with hyperparameter_scope() as scope:
+    with hyperparameters_scope() as scope:
         assert f() == 1
         assert g() == 2
 
@@ -41,7 +41,7 @@ def test_no_name():
     def f():
         return Hyperparameter() @ 1
 
-    with hyperparameter_scope() as scope:
+    with hyperparameters_scope() as scope:
         assert f() == 1
 
     scope.hyperparameters[f].hparam0 = 2
@@ -53,7 +53,7 @@ def test_no_name():
     def g():
         return Hyperparameter() @ "Hello" + Hyperparameter() @ "Hello"
 
-    with hyperparameter_scope() as scope:
+    with hyperparameters_scope() as scope:
         assert g() == "HelloHello"
 
     scope.hyperparameters[g].hparam1 = "World"
@@ -67,7 +67,7 @@ def test_with_name():
     def f():
         return Hyperparameter("hello") @ 1
 
-    with hyperparameter_scope() as scope:
+    with hyperparameters_scope() as scope:
         assert f() == 1
 
     scope.hyperparameters[f].hello = 2
@@ -79,7 +79,7 @@ def test_with_name():
     def g():
         return Hyperparameter("hello") @ "Hello" + Hyperparameter("hello") @ "Hello"
 
-    with hyperparameter_scope() as scope:
+    with hyperparameters_scope() as scope:
         assert g() == "HelloHello"
 
     scope.hyperparameters[g].hello = "World"
@@ -97,7 +97,7 @@ def test_nested():
     def g():
         return Hyperparameter("hello") @ 3 + f()
 
-    with hyperparameter_scope() as scope:
+    with hyperparameters_scope() as scope:
         assert g() == 6
 
     scope.hyperparameters[g].hello = 4

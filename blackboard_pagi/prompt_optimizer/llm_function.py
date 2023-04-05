@@ -19,12 +19,13 @@ from pydantic import BaseModel, ValidationError, create_model, generics
 from pydantic.fields import FieldInfo, Undefined
 from pydantic.generics import replace_types
 
-from blackboard_pagi.prompt_optimizer.track_execution_old import ChatChain, prompt_hyperparameter, track_execution
-from blackboard_pagi.prompts.chat_chain import ChatChain as UntrackedChatChain
+from blackboard_pagi.prompt_optimizer.track_hyperparameters import Hyperparameter, track_hyperparameters
+from blackboard_pagi.prompts.chat_chain import ChatChain
 
 T = typing.TypeVar("T")
 P = typing_extensions.ParamSpec("P")
 B = typing.TypeVar("B", bound=BaseModel)
+F = typing.TypeVar("F", bound=typing.Callable)
 
 
 def get_json_schema_hyperparameters(schema: dict):
@@ -196,7 +197,7 @@ class LLMFunctionSpec:
         # or a TrackedChatChain
         first_parameter = next(iter(parameters.values()))
         if first_parameter.annotation is not inspect.Parameter.empty:
-            if not issubclass(first_parameter.annotation, BaseLanguageModel | ChatChain | UntrackedChatChain):
+            if not issubclass(first_parameter.annotation, BaseLanguageModel | ChatChain):
                 raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
 
         # create a pydantic model from the parameters
@@ -524,23 +525,17 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
     def __getattr__(self, item):
         return getattr(self.__wrapped__, item)
 
-    def explicit(
-        self, language_model_or_chat_chain: BaseLanguageModel | ChatChain | UntrackedChatChain, inputs: BaseModel
-    ):
+    def explicit(self, language_model_or_chat_chain: BaseLanguageModel | ChatChain, inputs: BaseModel):
         """Call the function with explicit inputs."""
         return self(language_model_or_chat_chain, **inputs.dict())
 
     def __call__(
         self,
-        language_model_or_chat_chain: BaseLanguageModel | ChatChain | UntrackedChatChain,
+        language_model_or_chat_chain: BaseLanguageModel | ChatChain,
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> T:
         """Call the function."""
-        if isinstance(language_model_or_chat_chain, UntrackedChatChain):
-            language_model_or_chat_chain = ChatChain(
-                language_model_or_chat_chain.chat_model, language_model_or_chat_chain.messages
-            )
 
         # check that the first argument is an instance of BaseLanguageModel
         # or a TrackedChatChain or UntrackedChatChain
@@ -561,12 +556,12 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
 
         update_json_schema_hyperparameters(
             schema,
-            prompt_hyperparameter("schema") @ get_json_schema_hyperparameters(schema),
+            Hyperparameter("schema") @ get_json_schema_hyperparameters(schema),
         )
 
         # create the prompt
         prompt = (
-            prompt_hyperparameter("llm_function_prompt")
+            Hyperparameter("llm_function_prompt")
             @ (
                 "{docstring}\n"
                 "\n"
@@ -606,7 +601,7 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
         )
 
         # get the response
-        num_retries = prompt_hyperparameter("num_retries_on_parser_failure") @ 3
+        num_retries = Hyperparameter("num_retries_on_parser_failure") @ 3
 
         if language_model_or_chat_chain is None:
             raise ValueError("The language model or chat chain must be provided.")
@@ -614,16 +609,15 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
             chain = language_model_or_chat_chain
             for _ in range(num_retries):
                 output, chain = chain.query(prompt)
-                prompt_hyperparameter.track_chain(chain)
 
                 try:
                     parsed_output = self.parse(output, spec.output_model)
                     break
                 except OutputParserException as e:
                     prompt = (
-                        prompt_hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
+                        Hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
                         + str(e)
-                        + prompt_hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
+                        + Hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
                     )
             else:
                 raise OutputParserException(f"Failed to parse the output after {num_retries} retries.")
@@ -645,16 +639,14 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
                 except OutputParserException as e:
                     new_prompt = (
                         prompt
-                        + prompt_hyperparameter("output_prompt") @ "\n\nReceived the output\n\n"
+                        + Hyperparameter("output_prompt") @ "\n\nReceived the output\n\n"
                         + output
-                        + prompt_hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
+                        + Hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
                         + str(e)
-                        + prompt_hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
+                        + Hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
                     )
             else:
-                prompt_hyperparameter.track_llm(prompt, output)
                 raise ValueError(f"Failed to parse the output after {num_retries} retries.")
-            prompt_hyperparameter.track_llm(prompt, output)
         else:
             raise ValueError("The language model or chat chain must be provided.")
 
@@ -679,7 +671,7 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
             raise OutputParserException(msg)
 
 
-def llm_function(f: typing.Callable[P, T]) -> LLMFunction[P, T]:
+def llm_function(f: F) -> F:
     """
     Decorator to wrap a function with a chat model.
 
@@ -687,23 +679,24 @@ def llm_function(f: typing.Callable[P, T]) -> LLMFunction[P, T]:
 
     The docstring of the function provides instructions for the model.
     """
+    specific_llm_function: object
     if isinstance(f, classmethod):
-        return classmethod(llm_function(f.__func__))
+        specific_llm_function = classmethod(llm_function(f.__func__))
     elif isinstance(f, staticmethod):
-        return staticmethod(llm_function(f.__func__))
+        specific_llm_function = staticmethod(llm_function(f.__func__))
     elif isinstance(f, property):
-        return property(llm_function(f.fget), doc=f.__doc__)
+        specific_llm_function = property(llm_function(f.fget), doc=f.__doc__)
     elif isinstance(f, types.MethodType):
-        return types.MethodType(llm_function(f.__func__), f.__self__)
+        specific_llm_function = types.MethodType(llm_function(f.__func__), f.__self__)
     elif hasattr(f, "__wrapped__"):
-        return llm_function(f.__wrapped__)
+        specific_llm_function = llm_function(f.__wrapped__)
     elif isinstance(f, LLMFunction):
-        return f
+        specific_llm_function = f
     elif not callable(f):
         raise ValueError(f"Cannot decorate {f} with llm_strategy.")
+    else:
+        if not is_not_implemented(f):
+            raise ValueError("The function must not be implemented.")
 
-    if not is_not_implemented(f):
-        raise ValueError("The function must not be implemented.")
-
-    specific_llm_function: LLMFunction = track_execution(functools.wraps(f)(LLMFunction()))
-    return specific_llm_function
+        specific_llm_function = track_hyperparameters(functools.wraps(f)(LLMFunction()))
+    return typing.cast(F, specific_llm_function)
