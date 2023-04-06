@@ -145,53 +145,57 @@ class OptimizationStep(GenericModel, Generic[T_TaskParameters, T_TaskResults, T_
     )
 
 
-@llm_function
-def reflect_on_task_run(
-    language_model, task_run: TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]
-) -> TaskReflection:
-    """
-    Reflect on the task run.
-    """
-    raise NotImplementedError()
+class LLMOptimizer:
+    @llm_function
+    @staticmethod
+    def reflect_on_task_run(
+        language_model, task_run: TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]
+    ) -> TaskReflection:
+        """
+        Reflect on the results given the task parameters and hyperparameters.
 
+        This contains the lessons we learn from each task run to come up with better hyperparameters to try.
+        """
+        raise NotImplementedError()
 
-@llm_function
-def summarize_optimization_info(
-    language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
-) -> str:
-    """
-    Summarize the optimization info. We want to preserve all relevant knowledge for
-    improving the hyperparameters in the future. All information from previous experiments will be
-    forgotten except for what this summary.
-    """
-    raise NotImplementedError()
+    @llm_function
+    @staticmethod
+    def summarize_optimization_info(
+        language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
+    ) -> str:
+        """
+        Summarize the optimization info. We want to preserve all relevant knowledge for
+        improving the hyperparameters in the future. All information from previous experiments will be
+        forgotten except for what this summary.
+        """
+        raise NotImplementedError()
 
+    @llm_function
+    @staticmethod
+    def suggest_next_optimization_step(
+        language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
+    ) -> OptimizationStep[T_TaskParameters, T_TaskResults, T_Hyperparameters]:
+        """
+        Suggest the next optimization step.
+        """
+        raise NotImplementedError()
 
-@llm_function
-def suggest_next_optimization_step(
-    language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
-) -> OptimizationStep[T_TaskParameters, T_TaskResults, T_Hyperparameters]:
-    """
-    Suggest the next optimization step.
-    """
-    raise NotImplementedError()
-
-
-@llm_function
-def probability_for_improvement(
-    language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
-) -> typing.Annotated[
-    float,
-    Field(
-        ge=0.0,
-        le=1.0,
-        description="The self-reported probability that the next optimization steps will improve the hyperparameters.",
-    ),
-]:
-    """
-    Return the probability for improvement.
-    """
-    raise NotImplementedError()
+    @llm_function
+    @staticmethod
+    def probability_for_improvement(
+        language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
+    ) -> typing.Annotated[
+        float,
+        Field(
+            ge=0.0,
+            le=1.0,
+            description="The self-reported probability that the next optimization steps will improve the hyperparameters.",
+        ),
+    ]:
+        """
+        Return the probability for improvement.
+        """
+        raise NotImplementedError()
 
 
 @dataclass

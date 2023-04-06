@@ -249,9 +249,7 @@ class LLMFunctionSpec:
         )
 
     @staticmethod
-    def from_call(
-        f: typing.Callable[P, T], language_model_or_chain, args: P.args, kwargs: P.kwargs
-    ) -> "LLMFunctionSpec":
+    def from_call(f: typing.Callable[P, T], args: P.args, kwargs: P.kwargs) -> "LLMFunctionSpec":
         """Create an LLMFunctionSpec from a function."""
 
         # get clean docstring of
@@ -290,7 +288,7 @@ class LLMFunctionSpec:
         return_type = return_info[0]
 
         # resolve generic types
-        bound_arguments = LLMFunctionSpec.bind(args, kwargs, language_model_or_chain, signature)
+        bound_arguments = LLMFunctionSpec.bind(args, kwargs, None, signature)
         generic_type_map = LLMFunctionSpec.resolve_generic_types(parameters_items[1:], bound_arguments.arguments)
         return_type = LLMFunctionSpec.resolve_type(return_type, generic_type_map)
         return_info = (return_type, return_info[1])
@@ -506,10 +504,10 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
     """
 
     def get_spec_from_inputs(self, inputs: BaseModel) -> LLMFunctionSpec:
-        return LLMFunctionSpec.from_call(self, None, args=(), kwargs=inputs.dict())
+        return LLMFunctionSpec.from_call(self, args=(), kwargs=inputs.dict())
 
     def get_spec_from_args(self, *args, **kwargs) -> LLMFunctionSpec:
-        return LLMFunctionSpec.from_call(self, None, args, kwargs)
+        return LLMFunctionSpec.from_call(self, args, kwargs)
 
     def get_inputs(self, *args, **kwargs) -> BaseModel:
         return self.get_spec_from_args(*args, **kwargs).get_inputs(*args, **kwargs)
@@ -542,10 +540,10 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
         if not isinstance(language_model_or_chat_chain, BaseLanguageModel | ChatChain):
             raise ValueError("The first parameter must be an instance of BaseLanguageModel or ChatChain.")
 
-        spec = LLMFunctionSpec.from_call(self, language_model_or_chat_chain, args, kwargs)
+        spec = LLMFunctionSpec.from_call(self, args, kwargs)
 
         # bind the inputs to the signature
-        bound_arguments = spec.signature.bind(language_model_or_chat_chain, *args, **kwargs)
+        bound_arguments = spec.signature.bind(None, *args, **kwargs)
         # get the arguments
         arguments = bound_arguments.arguments
         inputs = spec.input_model(**arguments)
@@ -599,7 +597,7 @@ def llm_function(f: F | LLMFunction[P, T]) -> F | LLMFunction[P, T]:
 
 
 @track_hyperparameters
-def query(spec, language_model_or_chat_chain, schema, inputs):
+def query(spec: LLMFunctionSpec, language_model_or_chat_chain, schema, inputs):
     # create the prompt
     prompt = (
         Hyperparameter("llm_function_prompt")
@@ -644,6 +642,10 @@ def query(spec, language_model_or_chat_chain, schema, inputs):
     num_retries = Hyperparameter("num_retries_on_parser_failure") @ 3
     if language_model_or_chat_chain is None:
         raise ValueError("The language model or chat chain must be provided.")
+
+    if isinstance(language_model_or_chat_chain, BaseChatModel):
+        language_model_or_chat_chain = ChatChain(language_model_or_chat_chain, [])
+
     if isinstance(language_model_or_chat_chain, ChatChain):
         chain = language_model_or_chat_chain
         for _ in range(num_retries):
@@ -660,22 +662,16 @@ def query(spec, language_model_or_chat_chain, schema, inputs):
                 )
         else:
             raise OutputParserException(f"Failed to parse the output after {num_retries} retries.")
-    elif isinstance(language_model_or_chat_chain, BaseChatModel | BaseLLM):
-        new_prompt = prompt
+    elif isinstance(language_model_or_chat_chain, BaseLLM):
+        model: BaseChatModel = language_model_or_chat_chain
         for _ in range(num_retries):
-            prompt = new_prompt
-            if isinstance(language_model_or_chat_chain, BaseChatModel):
-                output = language_model_or_chat_chain.call_as_llm(prompt)
-            elif isinstance(language_model_or_chat_chain, BaseLLM):
-                output = language_model_or_chat_chain(prompt)
-            else:
-                raise ValueError("The language model or chat chain must be provided.")
+            output = model(prompt)
 
             try:
                 parsed_output = parse(output, spec.output_model)
                 break
             except OutputParserException as e:
-                new_prompt = (
+                prompt = (
                     prompt
                     + Hyperparameter("output_prompt") @ "\n\nReceived the output\n\n"
                     + output
