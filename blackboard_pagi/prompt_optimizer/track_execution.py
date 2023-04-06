@@ -3,11 +3,16 @@ from typing import List, Optional
 
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms import BaseLLM
-from langchain.schema import BaseMessage, ChatMessage, ChatResult, LLMResult
+from langchain.schema import BaseLanguageModel, BaseMessage, ChatMessage, ChatResult, LLMResult
 from pydantic import BaseModel, Field
+
+from blackboard_pagi.prompts.chat_chain import ChatChain
 
 T = typing.TypeVar("T")
 P = typing.ParamSpec("P")
+
+LangchainInterface: typing.TypeAlias = BaseLanguageModel | ChatChain
+LI = typing.TypeVar("LI", BaseLanguageModel, ChatChain)
 
 
 class ChatTree(BaseModel):
@@ -154,3 +159,27 @@ class TrackedChatModel(BaseChatModel):
         for generation in chat_result.generations:
             node.insert([generation.message])
         return chat_result
+
+
+def track_langchain(language_model_or_chat_chain: LI) -> LI:
+    if isinstance(language_model_or_chat_chain, ChatChain):
+        return ChatChain(
+            chat_model=TrackedChatModel(chat_model=language_model_or_chat_chain.chat_model),
+            messages=language_model_or_chat_chain.messages,
+        )
+    elif isinstance(language_model_or_chat_chain, BaseLLM):
+        return TrackedLLM(llm=language_model_or_chat_chain)
+    elif isinstance(language_model_or_chat_chain, BaseChatModel):
+        return TrackedChatModel(language_model=language_model_or_chat_chain)
+    else:
+        raise ValueError(f"Unknown language model type {type(language_model_or_chat_chain)}")
+
+
+def get_tracked_chats(chat_model_or_chat_chain: ChatChain | TrackedChatModel) -> dict:
+    if isinstance(chat_model_or_chat_chain, ChatChain):
+        model = chat_model_or_chat_chain.chat_model
+    elif isinstance(chat_model_or_chat_chain, TrackedChatModel):
+        model = chat_model_or_chat_chain
+    else:
+        raise ValueError(f"Unknown language model type {type(chat_model_or_chat_chain)}")
+    return model.tracked_chats.build_compact_dict()["children"]

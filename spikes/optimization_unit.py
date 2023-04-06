@@ -17,8 +17,14 @@ from pydantic.generics import GenericModel
 
 from blackboard_pagi.cached_chat_model import CachedChatOpenAI
 from blackboard_pagi.prompt_optimizer.llm_function import LLMFunction, llm_function
-from blackboard_pagi.prompt_optimizer.track_execution import TrackedChatModel
+from blackboard_pagi.prompt_optimizer.track_execution import (
+    LangchainInterface,
+    TrackedChatModel,
+    get_tracked_chats,
+    track_langchain,
+)
 from blackboard_pagi.prompt_optimizer.track_hyperparameters import (
+    Hyperparameters,
     HyperparametersBuilder,
     hyperparameters_scope,
     track_hyperparameters,
@@ -27,8 +33,8 @@ from blackboard_pagi.prompts.chat_chain import ChatChain
 
 langchain.llm_cache = SQLiteCache(".self_optimization.langchain.db")
 
-chat_model = ChatOpenAI(model_name="gpt-4", max_tokens=1024, model_kwargs=dict(temperature=0.1))
-# chat_model = CachedChatOpenAI(max_tokens=1024)
+# chat_model = ChatOpenAI(model_name="gpt-4", max_tokens=1024, model_kwargs=dict(temperature=0.1))
+chat_model = CachedChatOpenAI(max_tokens=1024, model_kwargs=dict(temperature=0.1))
 
 text_model = OpenAI(
     model_name="text-davinci-003",
@@ -38,24 +44,24 @@ text_model = OpenAI(
 
 # %%
 
-TaskParameters = TypeVar('TaskParameters')
-TaskResults = TypeVar('TaskResults')
-Hyperparameters = TypeVar('Hyperparameters')
+T_TaskParameters = TypeVar('T_TaskParameters')
+T_TaskResults = TypeVar('T_TaskResults')
+T_Hyperparameters = TypeVar('T_Hyperparameters')
 
 
-class TaskRun(GenericModel, Generic[TaskParameters, TaskResults, Hyperparameters]):
+class TaskRun(GenericModel, Generic[T_TaskParameters, T_TaskResults, T_Hyperparameters]):
     """
     The task run. This is the 'data' we use to optimize the hyperparameters.
     """
 
-    task_parameters: TaskParameters = Field(..., description="The task parameters.")
-    hyperparameters: Hyperparameters = Field(
+    task_parameters: T_TaskParameters = Field(..., description="The task parameters.")
+    hyperparameters: T_Hyperparameters = Field(
         ...,
         description="The hyperparameters used for the task. We optimize these.",
     )
     all_chat_chains: list[dict] = Field(..., description="The chat chains from the task execution.")
     # all_prompts: dict[str, str] = Field(..., description="The prompts and outputs from the task execution.")
-    return_value: TaskResults = Field(..., description="The results of the task.")
+    return_value: T_TaskResults = Field(..., description="The results of the task.")
 
 
 class TaskReflection(BaseModel):
@@ -88,20 +94,20 @@ class TaskReflection(BaseModel):
     )
 
 
-class TaskInfo(GenericModel, Generic[TaskParameters, TaskResults, Hyperparameters]):
+class TaskInfo(GenericModel, Generic[T_TaskParameters, T_TaskResults, T_Hyperparameters]):
     """
     The task run and the reflection on the experiment.
     """
 
-    task_parameters: TaskParameters = Field(..., description="The task parameters.")
-    hyperparameters: Hyperparameters = Field(
+    task_parameters: T_TaskParameters = Field(..., description="The task parameters.")
+    hyperparameters: T_Hyperparameters = Field(
         ...,
         description="The hyperparameters used for the task. We optimize these.",
     )
     reflection: TaskReflection = Field(..., description="The reflection on the task.")
 
 
-class OptimizationInfo(GenericModel, Generic[TaskParameters, TaskResults, Hyperparameters]):
+class OptimizationInfo(GenericModel, Generic[T_TaskParameters, T_TaskResults, T_Hyperparameters]):
     """
     The optimization information. This is the data we use to optimize the hyperparameters.
     """
@@ -110,19 +116,19 @@ class OptimizationInfo(GenericModel, Generic[TaskParameters, TaskResults, Hyperp
         None,
         description="A summary of previous experiments and the proposed changes with the goal of avoiding trying the same changes repeatedly.",
     )
-    task_infos: list[TaskInfo[TaskParameters, TaskResults, Hyperparameters]] = Field(
+    task_infos: list[TaskInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]] = Field(
         ..., description="The most recent tasks we have run and our reflections on them."
     )
-    best_hyperparameters: Hyperparameters = Field(..., description="The best hyperparameters we have found so far.")
+    best_hyperparameters: T_Hyperparameters = Field(..., description="The best hyperparameters we have found so far.")
 
 
-class OptimizationStep(GenericModel, Generic[TaskParameters, TaskResults, Hyperparameters]):
+class OptimizationStep(GenericModel, Generic[T_TaskParameters, T_TaskResults, T_Hyperparameters]):
     """
     The next optimization steps. New hyperparameters we want to try given the previous experiments and
     new task parameters we want to evaluate on given the previous experiments.
     """
 
-    best_hyperparameters: Hyperparameters = Field(
+    best_hyperparameters: T_Hyperparameters = Field(
         ..., description="The best hyperparameters we have found so far given " "task_infos and history."
     )
     suggestion: str = Field(
@@ -131,7 +137,7 @@ class OptimizationStep(GenericModel, Generic[TaskParameters, TaskResults, Hyperp
         "We will try several tasks next and several sets of hyperparameters. Let's think step by "
         "step.",
     )
-    task_parameters_suggestions: list[TaskParameters] = Field(
+    task_parameters_suggestions: list[T_TaskParameters] = Field(
         ..., description="The task parameters we want to try next.", hint_min_items=1, hint_max_items=4
     )
     hyperparameter_suggestions: list[dict] = Field(
@@ -141,7 +147,7 @@ class OptimizationStep(GenericModel, Generic[TaskParameters, TaskResults, Hyperp
 
 @llm_function
 def reflect_on_task_run(
-    language_model, task_run: TaskRun[TaskParameters, TaskResults, Hyperparameters]
+    language_model, task_run: TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]
 ) -> TaskReflection:
     """
     Reflect on the task run.
@@ -151,7 +157,7 @@ def reflect_on_task_run(
 
 @llm_function
 def summarize_optimization_info(
-    language_model, optimization_info: OptimizationInfo[TaskParameters, TaskResults, Hyperparameters]
+    language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
 ) -> str:
     """
     Summarize the optimization info. We want to preserve all relevant knowledge for
@@ -163,8 +169,8 @@ def summarize_optimization_info(
 
 @llm_function
 def suggest_next_optimization_step(
-    language_model, optimization_info: OptimizationInfo[TaskParameters, TaskResults, Hyperparameters]
-) -> OptimizationStep[TaskParameters, TaskResults, Hyperparameters]:
+    language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
+) -> OptimizationStep[T_TaskParameters, T_TaskResults, T_Hyperparameters]:
     """
     Suggest the next optimization step.
     """
@@ -173,7 +179,7 @@ def suggest_next_optimization_step(
 
 @llm_function
 def probability_for_improvement(
-    language_model, optimization_info: OptimizationInfo[TaskParameters, TaskResults, Hyperparameters]
+    language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
 ) -> typing.Annotated[
     float,
     Field(
@@ -212,24 +218,24 @@ capture_func_args_kwargs = CaptureFuncArgsKWArgs()
 
 
 def capture_task_run(
-    chat_model,
+    llm_interface: LangchainInterface,
     task_executor: LLMFunction,
-    task_parameters: TaskParameters,
+    task_parameters: T_TaskParameters,
     hyperparameters: BaseModel,
-) -> TaskRun[TaskParameters, TaskResults, Hyperparameters]:
+) -> TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]:
     """
     Capture the task run.
     """
-    tracked_chat_model = TrackedChatModel(chat_model=chat_model)
+    tracked_chat_model = track_langchain(llm_interface)
 
     llm_function_spec = task_executor.get_spec_from_inputs(task_parameters)
     with hyperparameters_scope(hyperparameters) as scope:
-        return_value = task_executor(chat_model, **task_parameters.dict())
+        return_value = task_executor(llm_interface, **task_parameters.dict())
 
     return TaskRun[llm_function_spec.input_model, llm_function_spec.return_type, type(scope.hyperparameters)](
         task_parameters=task_parameters,
         hyperparameters=scope.hyperparameters,
-        all_chat_chains=tracked_chat_model.tracked_chats.build_compact_dict(),
+        all_chat_chains=get_tracked_chats(tracked_chat_model),
         return_value=return_value,
     )
 
@@ -238,8 +244,8 @@ def capture_task_run(
 def optimize_hyperparameters(
     chat_model: BaseChatModel,
     task_executor,
-    seed_task_runs: list[TaskRun[TaskParameters, TaskResults, Hyperparameters]],
-) -> OptimizationStep[TaskParameters, TaskResults, Hyperparameters]:
+    seed_task_runs: list[TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]],
+) -> OptimizationStep[T_TaskParameters, T_TaskResults, T_Hyperparameters]:
     """
     Optimize the hyperparameters.
     """
@@ -249,7 +255,7 @@ def optimize_hyperparameters(
     llm_function_spec = task_executor.get_spec_from_inputs(seed_task_runs[0].task_parameters)
 
     task_infos = [
-        TaskInfo[llm_function_spec.input_model, llm_function_spec.output_model](
+        TaskInfo[llm_function_spec.input_model, llm_function_spec.output_model, type(task_run.hyperparameters)](
             task_parameters=task_run.task_parameters,
             hyperparameters=task_run.hyperparameters,
             results=task_run.return_value,
@@ -258,18 +264,14 @@ def optimize_hyperparameters(
         for task_run in seed_task_runs
     ]
 
-    hyperparameters_builder = HyperparametersBuilder()
-    for task_info in task_infos:
-        hyperparameters_builder.update(task_info.hyperparameters)
-
-    hyperparameter_model = hyperparameters_builder.build()
-    hyperparameter_type = type(hyperparameter_model)
+    hyperparamters = Hyperparameters.merge(task_info.hyperparameters for task_info in task_infos)
+    hyperparameter_type = type(hyperparamters)
 
     optimization_info = OptimizationInfo[
         llm_function_spec.input_model, llm_function_spec.output_model, hyperparameter_type
     ](
         task_infos=task_infos,
-        best_hyperparameters=hyperparameter_model,
+        best_hyperparameters=hyperparamters,
     )
 
     optimization_step = None
@@ -355,7 +357,7 @@ seed_task_runs = [
     for topic in essay_topics[:2]
 ]
 
-all_hyperparameters = deepcopy(create_essay_topics.all_hyperparameters)
+all_hyperparameters = Hyperparameters.merge(task_run.hyperparameters for task_run in seed_task_runs)
 
 # Update seed task runs with the hyperparameters we found.
 for task_run in seed_task_runs:

@@ -556,122 +556,18 @@ class LLMFunction(typing.Generic[P, T], typing.Callable[P, T]):  # type: ignore
 
         update_json_schema_hyperparameters(
             schema,
-            Hyperparameter("schema") @ get_json_schema_hyperparameters(schema),
+            Hyperparameter("json_schema") @ get_json_schema_hyperparameters(schema),
         )
 
-        # create the prompt
-        prompt = (
-            Hyperparameter("llm_function_prompt")
-            @ (
-                "{docstring}\n"
-                "\n"
-                "The input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n"
-                "\n"
-                'As an example, for the schema {{"properties": {{"foo": {{"description": "a list of '
-                'strings", "type": "array", "items": {{"type": "string"}}}}}}, "required": ["foo"]}}}} the object {{'
-                '"foo": ["bar", "baz"]}} is a well-formatted instance of the schema. The object {{"properties": {{'
-                '"foo": '
-                '["bar", "baz"]}}}} is not well-formatted.\n'
-                "\n"
-                "Here is the schema for additional date types:\n"
-                "```\n"
-                "{additional_definitions}\n"
-                "```\n"
-                "\n"
-                "Here is the input schema:\n"
-                "```\n"
-                "{input_schema}\n"
-                "```\n"
-                "\n"
-                "Here is the output schema:\n"
-                "```\n"
-                "{output_schema}\n"
-                "```\n"
-                "Now output the results for the following inputs:\n"
-                "```\n"
-                "{inputs}\n"
-                "```\n"
-            )
-        ).format(
-            docstring=spec.docstring,
-            additional_definitions=json.dumps(schema['additional_definitions'], indent=1),
-            input_schema=json.dumps(schema['input_schema'], indent=1),
-            output_schema=json.dumps(schema['output_schema'], indent=1),
-            inputs=inputs.json(indent=1),
-        )
-
-        # get the response
-        num_retries = Hyperparameter("num_retries_on_parser_failure") @ 3
-
-        if language_model_or_chat_chain is None:
-            raise ValueError("The language model or chat chain must be provided.")
-        if isinstance(language_model_or_chat_chain, ChatChain):
-            chain = language_model_or_chat_chain
-            for _ in range(num_retries):
-                output, chain = chain.query(prompt)
-
-                try:
-                    parsed_output = self.parse(output, spec.output_model)
-                    break
-                except OutputParserException as e:
-                    prompt = (
-                        Hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
-                        + str(e)
-                        + Hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
-                    )
-            else:
-                raise OutputParserException(f"Failed to parse the output after {num_retries} retries.")
-        elif isinstance(language_model_or_chat_chain, BaseChatModel | BaseLLM):
-            new_prompt = prompt
-            output = ""
-            for _ in range(num_retries):
-                prompt = new_prompt
-                if isinstance(language_model_or_chat_chain, BaseChatModel):
-                    output = language_model_or_chat_chain.call_as_llm(prompt)
-                elif isinstance(language_model_or_chat_chain, BaseLLM):
-                    output = language_model_or_chat_chain(prompt)
-                else:
-                    raise ValueError("The language model or chat chain must be provided.")
-
-                try:
-                    parsed_output = self.parse(output, spec.output_model)
-                    break
-                except OutputParserException as e:
-                    new_prompt = (
-                        prompt
-                        + Hyperparameter("output_prompt") @ "\n\nReceived the output\n\n"
-                        + output
-                        + Hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
-                        + str(e)
-                        + Hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
-                    )
-            else:
-                raise ValueError(f"Failed to parse the output after {num_retries} retries.")
-        else:
-            raise ValueError("The language model or chat chain must be provided.")
+        parsed_output = query(spec, language_model_or_chat_chain, schema, inputs)
 
         print(f"Input: {inputs.json(indent=1)}")
         print(f"Output: {json.dumps(parsed_output.dict()['return_value'], indent=1)}")
 
         return parsed_output.return_value  # type: ignore
 
-    @staticmethod
-    def parse(text: str, output_model: type[B]) -> B:
-        try:
-            # Greedy search for 1st json candidate.
-            match = re.search(r"\{.*\}", text.strip(), re.MULTILINE | re.IGNORECASE | re.DOTALL)
-            json_str = ""
-            if match:
-                json_str = match.group()
-            json_object = json.loads(json_str)
-            return output_model.parse_obj(json_object)
 
-        except (json.JSONDecodeError, ValidationError) as e:
-            msg = f"Failed to parse the last reply. Expected: `{{\"return_value\": ...}}` Got: {e}"
-            raise OutputParserException(msg)
-
-
-def llm_function(f: F) -> F:
+def llm_function(f: F | LLMFunction[P, T]) -> F | LLMFunction[P, T]:
     """
     Decorator to wrap a function with a chat model.
 
@@ -700,3 +596,110 @@ def llm_function(f: F) -> F:
 
         specific_llm_function = track_hyperparameters(functools.wraps(f)(LLMFunction()))
     return typing.cast(F, specific_llm_function)
+
+
+@track_hyperparameters
+def query(spec, language_model_or_chat_chain, schema, inputs):
+    # create the prompt
+    prompt = (
+        Hyperparameter("llm_function_prompt")
+        @ (
+            "{docstring}\n"
+            "\n"
+            "The input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n"
+            "\n"
+            'As an example, for the schema {{"properties": {{"foo": {{"description": "a list of '
+            'strings", "type": "array", "items": {{"type": "string"}}}}}}, "required": ["foo"]}}}} the object {{'
+            '"foo": ["bar", "baz"]}} is a well-formatted instance of the schema. The object {{"properties": {{'
+            '"foo": '
+            '["bar", "baz"]}}}} is not well-formatted.\n'
+            "\n"
+            "Here is the schema for additional date types:\n"
+            "```\n"
+            "{additional_definitions}\n"
+            "```\n"
+            "\n"
+            "Here is the input schema:\n"
+            "```\n"
+            "{input_schema}\n"
+            "```\n"
+            "\n"
+            "Here is the output schema:\n"
+            "```\n"
+            "{output_schema}\n"
+            "```\n"
+            "Now output the results for the following inputs:\n"
+            "```\n"
+            "{inputs}\n"
+            "```\n"
+        )
+    ).format(
+        docstring=spec.docstring,
+        additional_definitions=json.dumps(schema['additional_definitions'], indent=1),
+        input_schema=json.dumps(schema['input_schema'], indent=1),
+        output_schema=json.dumps(schema['output_schema'], indent=1),
+        inputs=inputs.json(indent=1),
+    )
+    # get the response
+    num_retries = Hyperparameter("num_retries_on_parser_failure") @ 3
+    if language_model_or_chat_chain is None:
+        raise ValueError("The language model or chat chain must be provided.")
+    if isinstance(language_model_or_chat_chain, ChatChain):
+        chain = language_model_or_chat_chain
+        for _ in range(num_retries):
+            output, chain = chain.query(prompt)
+
+            try:
+                parsed_output = parse(output, spec.output_model)
+                break
+            except OutputParserException as e:
+                prompt = (
+                    Hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
+                    + str(e)
+                    + Hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
+                )
+        else:
+            raise OutputParserException(f"Failed to parse the output after {num_retries} retries.")
+    elif isinstance(language_model_or_chat_chain, BaseChatModel | BaseLLM):
+        new_prompt = prompt
+        for _ in range(num_retries):
+            prompt = new_prompt
+            if isinstance(language_model_or_chat_chain, BaseChatModel):
+                output = language_model_or_chat_chain.call_as_llm(prompt)
+            elif isinstance(language_model_or_chat_chain, BaseLLM):
+                output = language_model_or_chat_chain(prompt)
+            else:
+                raise ValueError("The language model or chat chain must be provided.")
+
+            try:
+                parsed_output = parse(output, spec.output_model)
+                break
+            except OutputParserException as e:
+                new_prompt = (
+                    prompt
+                    + Hyperparameter("output_prompt") @ "\n\nReceived the output\n\n"
+                    + output
+                    + Hyperparameter("error_prompt") @ "Tried to parse your output but failed:\n\n"
+                    + str(e)
+                    + Hyperparameter("retry_prompt") @ "\n\nPlease try again and avoid this issue."
+                )
+        else:
+            raise ValueError(f"Failed to parse the output after {num_retries} retries.")
+    else:
+        raise ValueError("The language model or chat chain must be provided.")
+    return parsed_output
+
+
+def parse(text: str, output_model: type[B]) -> B:
+    try:
+        # Greedy search for 1st json candidate.
+        match = re.search(r"\{.*\}", text.strip(), re.MULTILINE | re.IGNORECASE | re.DOTALL)
+        json_str = ""
+        if match:
+            json_str = match.group()
+        json_object = json.loads(json_str)
+        return output_model.parse_obj(json_object)
+
+    except (json.JSONDecodeError, ValidationError) as e:
+        msg = f"Failed to parse the last reply. Expected: `{{\"return_value\": ...}}` Got: {e}"
+        raise OutputParserException(msg)

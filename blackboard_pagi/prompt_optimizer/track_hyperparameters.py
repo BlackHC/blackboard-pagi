@@ -159,6 +159,16 @@ class HyperparameterBuilder:
             return definition.explicit_type
 
     def build(self):
+        # field_definitions = [
+        #     (name, self.get_type(name))
+        #     for name, definition in self.hyperparameter_definitions.items()
+        # ]
+        # namespace = {name: definition.field_info for name, definition in self.hyperparameter_definitions.items()}
+        #
+        # dataclass_type = dataclasses.make_dataclass(self.qualname, field_definitions, namespace=namespace)
+        # model = pydantic.dataclasses.dataclass(dataclass_type)
+        #
+        # return model(**self.hyperparameters)
         field_definitions = {
             name: (self.get_type(name), definition.field_info)
             for name, definition in self.hyperparameter_definitions.items()
@@ -202,6 +212,15 @@ class Hyperparameters(BaseModel):
         if f_hyperparameters is None:
             raise KeyError(f"Function {f_escaped_name} for {f} not found in hyperparameters!")
         return f_hyperparameters
+
+    @staticmethod
+    def merge(hyperparameters_iterable: typing.Iterable['Hyperparameters']) -> 'Hyperparameters':
+        hyperparameters_builder = HyperparametersBuilder()
+        for hyperparameters in hyperparameters_iterable:
+            hyperparameters_builder.update(hyperparameters)
+
+        hyperparameters = hyperparameters_builder.build()
+        return hyperparameters
 
 
 @dataclass
