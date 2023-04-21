@@ -3,7 +3,6 @@ Spike for a meta-loop that optimizes the prompt templates we use.
 """
 import functools
 import typing
-from copy import deepcopy
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
@@ -16,13 +15,8 @@ from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
 from blackboard_pagi.cached_chat_model import CachedChatOpenAI
-from blackboard_pagi.prompt_optimizer.llm_function import LLMFunction, llm_function
-from blackboard_pagi.prompt_optimizer.track_execution import (
-    LangchainInterface,
-    TrackedChatModel,
-    get_tracked_chats,
-    track_langchain,
-)
+from blackboard_pagi.prompt_optimizer.llm_function import LLMFunction, llm_explicit_function, llm_function
+from blackboard_pagi.prompt_optimizer.track_execution import LangchainInterface, get_tracked_chats, track_langchain
 from blackboard_pagi.prompt_optimizer.track_hyperparameters import (
     Hyperparameters,
     HyperparametersBuilder,
@@ -31,10 +25,10 @@ from blackboard_pagi.prompt_optimizer.track_hyperparameters import (
 )
 from blackboard_pagi.prompts.chat_chain import ChatChain
 
-langchain.llm_cache = SQLiteCache(".self_optimization.langchain.db")
+langchain.llm_cache = SQLiteCache(".optimization_unit.langchain.db")
 
-# chat_model = ChatOpenAI(model_name="gpt-4", max_tokens=1024, model_kwargs=dict(temperature=0.1))
-chat_model = CachedChatOpenAI(max_tokens=1024, model_kwargs=dict(temperature=0.1))
+chat_model = ChatOpenAI(model_name="gpt-4", request_timeout=240, max_tokens=1024, model_kwargs=dict(temperature=0.1))
+# chat_model = ChatOpenAI(max_tokens=512, model_kwargs=dict(temperature=0.5))
 
 text_model = OpenAI(
     model_name="text-davinci-003",
@@ -140,13 +134,13 @@ class OptimizationStep(GenericModel, Generic[T_TaskParameters, T_TaskResults, T_
     task_parameters_suggestions: list[T_TaskParameters] = Field(
         ..., description="The task parameters we want to try next.", hint_min_items=1, hint_max_items=4
     )
-    hyperparameter_suggestions: list[dict] = Field(
+    hyperparameter_suggestions: list[T_Hyperparameters] = Field(
         ..., description="The hyperparameters we want to try next.", hint_min_items=1, hint_max_items=2
     )
 
 
 class LLMOptimizer:
-    @llm_function
+    @llm_explicit_function
     @staticmethod
     def reflect_on_task_run(
         language_model, task_run: TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]
@@ -158,7 +152,7 @@ class LLMOptimizer:
         """
         raise NotImplementedError()
 
-    @llm_function
+    @llm_explicit_function
     @staticmethod
     def summarize_optimization_info(
         language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
@@ -170,7 +164,7 @@ class LLMOptimizer:
         """
         raise NotImplementedError()
 
-    @llm_function
+    @llm_explicit_function
     @staticmethod
     def suggest_next_optimization_step(
         language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
@@ -180,7 +174,7 @@ class LLMOptimizer:
         """
         raise NotImplementedError()
 
-    @llm_function
+    @llm_explicit_function
     @staticmethod
     def probability_for_improvement(
         language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
@@ -232,11 +226,11 @@ def capture_task_run(
     """
     tracked_chat_model = track_langchain(llm_interface)
 
-    llm_function_spec = task_executor.get_spec_from_inputs(task_parameters)
+    structured_prompt = task_executor.llm_bound_signature(**dict(task_parameters)).structured_prompt
     with hyperparameters_scope(hyperparameters) as scope:
-        return_value = task_executor(llm_interface, **task_parameters.dict())
+        return_value = task_executor.explicit(llm_interface, task_parameters)
 
-    return TaskRun[llm_function_spec.input_model, llm_function_spec.return_type, type(scope.hyperparameters)](
+    return TaskRun[structured_prompt.input_type, structured_prompt.return_annotation, type(scope.hyperparameters)](
         task_parameters=task_parameters,
         hyperparameters=scope.hyperparameters,
         all_chat_chains=get_tracked_chats(tracked_chat_model),
@@ -256,23 +250,26 @@ def optimize_hyperparameters(
 
     root_chain = ChatChain(chat_model, [])
 
-    llm_function_spec = task_executor.get_spec_from_inputs(seed_task_runs[0].task_parameters)
+    llm_bound_signature = task_executor.llm_bound_signature(**dict(seed_task_runs[0].task_parameters))
 
-    task_infos = [
-        TaskInfo[llm_function_spec.input_model, llm_function_spec.output_model, type(task_run.hyperparameters)](
-            task_parameters=task_run.task_parameters,
-            hyperparameters=task_run.hyperparameters,
-            results=task_run.return_value,
-            reflection=reflect_on_task_run(root_chain, task_run),
+    task_infos = []
+    for task_run in seed_task_runs:
+        task_infos.append(
+            TaskInfo[
+                llm_bound_signature.input_type, llm_bound_signature.return_annotation, type(task_run.hyperparameters)
+            ](
+                task_parameters=task_run.task_parameters,
+                hyperparameters=task_run.hyperparameters,
+                results=task_run.return_value,
+                reflection=LLMOptimizer.reflect_on_task_run(root_chain, task_run),
+            )
         )
-        for task_run in seed_task_runs
-    ]
 
     hyperparamters = Hyperparameters.merge(task_info.hyperparameters for task_info in task_infos)
     hyperparameter_type = type(hyperparamters)
 
     optimization_info = OptimizationInfo[
-        llm_function_spec.input_model, llm_function_spec.output_model, hyperparameter_type
+        llm_bound_signature.input_type, llm_bound_signature.return_annotation, hyperparameter_type
     ](
         task_infos=task_infos,
         best_hyperparameters=hyperparamters,
@@ -280,7 +277,7 @@ def optimize_hyperparameters(
 
     optimization_step = None
     for _ in range(3):
-        optimization_step = suggest_next_optimization_step(root_chain, optimization_info)
+        optimization_step = LLMOptimizer.suggest_next_optimization_step(root_chain, optimization_info)
 
         optimization_info.best_hyperparameters = optimization_step.best_hyperparameters
 
@@ -288,19 +285,21 @@ def optimize_hyperparameters(
             for hyperparameters in optimization_step.hyperparameter_suggestions:
                 task_run = capture_task_run(root_chain, task_executor, task_parameters, hyperparameters)
                 task_info = TaskInfo[
-                    llm_function_spec.input_model, llm_function_spec.output_model, type(hyperparameters)
+                    llm_bound_signature.input_type, llm_bound_signature.return_annotation, type(hyperparameters)
                 ](
                     task_parameters=task_run.task_parameters,
                     hyperparameters=task_run.hyperparameters,
                     results=task_run.return_value,
-                    reflection=reflect_on_task_run(root_chain, task_run),
+                    reflection=LLMOptimizer.reflect_on_task_run(root_chain, task_run),
                 )
                 optimization_info.task_infos.append(task_info)
 
         if len(optimization_info.task_infos) >= 20:
-            optimization_info.older_task_summary = summarize_optimization_info(
+            optimization_info.older_task_summary = LLMOptimizer.summarize_optimization_info(
                 root_chain,
-                OptimizationInfo[llm_function_spec.input_model, llm_function_spec.output_model, hyperparameter_type](
+                OptimizationInfo[
+                    llm_bound_signature.input_type, llm_bound_signature.return_annotation, hyperparameter_type
+                ](
                     older_task_summary=optimization_info.older_task_summary,
                     task_infos=optimization_info.task_infos[:-10],
                     best_hyperparameters=optimization_step.best_hyperparameters,
@@ -308,7 +307,7 @@ def optimize_hyperparameters(
             )
             optimization_info.task_infos = optimization_info.task_infos[-10:]
 
-        if probability_for_improvement(root_chain, optimization_info) < 0.5:
+        if LLMOptimizer.probability_for_improvement(root_chain, optimization_info) < 0.5:
             break
 
     return optimization_step
@@ -355,7 +354,7 @@ seed_task_runs = [
     capture_task_run(
         ChatChain(chat_model, []),
         create_essay_topics,
-        create_essay_topics.get_inputs(domain="comedy", n=2),
+        create_essay_topics.get_input_object(domain="comedy", n=2),
         BaseModel(),
     )
     for topic in essay_topics[:2]

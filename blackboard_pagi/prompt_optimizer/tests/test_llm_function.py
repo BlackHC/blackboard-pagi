@@ -1,3 +1,4 @@
+# type: ignore
 import inspect
 import re
 import typing
@@ -9,15 +10,16 @@ from pydantic import Field, create_model
 from pydantic.generics import GenericModel
 
 from blackboard_pagi.prompt_optimizer.llm_function import (
-    LLMFunctionSpec,
+    LLMBoundSignature,
+    LLMStructuredPrompt,
+    Output,
+    get_concise_type_repr,
     get_json_schema_hyperparameters,
     is_not_implemented,
     llm_function,
     update_json_schema_hyperparameters,
 )
 from blackboard_pagi.prompt_optimizer.track_execution_old import ChatChain
-from blackboard_pagi.prompts.chat_chain import ChatChain as UntrackedChatChain
-from blackboard_pagi.testing.fake_chat_model import FakeChatModel
 from blackboard_pagi.testing.fake_llm import FakeLLM
 
 
@@ -82,146 +84,101 @@ def test_is_not_implemented_function():
     assert not is_not_implemented(lambda: 1)
 
 
-def test_llm_function_spec_from_function():
-    def f(llm: BaseLLM, a: str, b: int = 1) -> str:
-        """Test docstring."""
-        raise NotImplementedError
+def test_get_concise_type_repr():
+    assert get_concise_type_repr(int) == "int"
+    assert get_concise_type_repr(typing.List[int]) == "list[int]"
+    assert get_concise_type_repr(list[int]) == "list[int]"
+    assert get_concise_type_repr(typing.List[typing.List[int]]) == "list[list[int]]"
+    assert get_concise_type_repr(list[list[int]]) == "list[list[int]]"
+    assert get_concise_type_repr(typing.Dict[str, int]) == "dict[str, int]"
+    assert get_concise_type_repr(dict[str, int]) == "dict[str, int]"
+    assert get_concise_type_repr(typing.Dict[str, typing.List[int]]) == "dict[str, list[int]]"
+    assert get_concise_type_repr(dict[str, list[int]]) == "dict[str, list[int]]"
+    assert get_concise_type_repr(typing.Dict[str, typing.Dict[str, int]]) == "dict[str, dict[str, int]]"
+    assert get_concise_type_repr(typing.Set[int]) == "set[int]"
+    assert get_concise_type_repr(set[int]) == "set[int]"
+    assert get_concise_type_repr(typing.Set[typing.Set[int]]) == "set[set[int]]"
+    assert get_concise_type_repr(set[set[int]]) == "set[set[int]]"
+    assert get_concise_type_repr(typing.Set[typing.List[int]]) == "set[list[int]]"
 
-    llm_function_spec = LLMFunctionSpec.from_function(f)
-    assert llm_function_spec.docstring == "Test docstring."
-    assert llm_function_spec.signature == inspect.signature(f)
-    assert llm_function_spec.input_model.schema() == create_model("Inputs", a=(str, ...), b=(int, 1)).schema()
-    assert llm_function_spec.output_model.schema() == create_model("Outputs", return_value=(str, ...)).schema()
+    class A:
+        pass
+
+    assert get_concise_type_repr(A) == "A"
+    assert get_concise_type_repr(typing.List[A]) == "list[A]"
+
+    # generic class
+    T = typing.TypeVar('T')
+
+    class B(GenericModel, typing.Generic[T]):
+        pass
+
+    assert get_concise_type_repr(B) == "B[T]"
+    assert get_concise_type_repr(typing.List[B]) == "list[B[T]]"
+    assert get_concise_type_repr(typing.List[B[int]]) == "list[B[int]]"
+    assert get_concise_type_repr(list[B[int]]) == "list[B[int]]"
 
 
 def test_llm_function_first_param():
-    def f(llm: BaseLLM, a: str, b: int = 1) -> str:
+    def f(llm: BaseLLM, a: str = "", b: int = 1) -> str:
         """Test docstring."""
         raise NotImplementedError
 
-    assert LLMFunctionSpec.from_function(f).input_model.schema() == {
+    assert LLMBoundSignature.from_call(f, (), {}).input_type.schema() == {
         'properties': {
-            'a': {'title': 'A', 'type': 'string'},
-            'b': {'title': 'B', 'type': 'integer', 'default': 1},
+            'a': {'default': '', 'title': 'A', 'type': 'string'},
+            'b': {'default': 1, 'title': 'B', 'type': 'integer'},
         },
-        'required': ['a'],
-        'title': 'Inputs',
+        'title': 'FInputs',
         'type': 'object',
     }
 
-    def g(chat_model: BaseChatModel, a: str, b: int = 1) -> str:
+    def g(chat_model: BaseChatModel, a: str = "", b: int = 1) -> str:
         """Test docstring."""
         raise NotImplementedError
 
-    assert LLMFunctionSpec.from_function(g).input_model.schema() == {
+    assert LLMBoundSignature.from_call(g, (), {}).input_type.schema() == {
         'properties': {
-            'a': {'title': 'A', 'type': 'string'},
-            'b': {'title': 'B', 'type': 'integer', 'default': 1},
+            'a': {'default': '', 'title': 'A', 'type': 'string'},
+            'b': {'default': 1, 'title': 'B', 'type': 'integer'},
         },
-        'required': ['a'],
-        'title': 'Inputs',
+        'title': 'GInputs',
         'type': 'object',
     }
 
-    def h(chat_chain: ChatChain, a: str, b: int = 1) -> str:
+    def h(chat_chain: ChatChain, a: str = "", b: int = 1) -> str:
         """Test docstring."""
         raise NotImplementedError
 
-    assert LLMFunctionSpec.from_function(h).input_model.schema() == {
+    assert LLMBoundSignature.from_call(h, (), {}).input_type.schema() == {
         'properties': {
-            'a': {'title': 'A', 'type': 'string'},
-            'b': {'title': 'B', 'type': 'integer', 'default': 1},
+            'a': {'default': '', 'title': 'A', 'type': 'string'},
+            'b': {'default': 1, 'title': 'B', 'type': 'integer'},
         },
-        'required': ['a'],
-        'title': 'Inputs',
+        'title': 'HInputs',
         'type': 'object',
     }
 
     # with a wrong type
     with pytest.raises(ValueError):
 
-        def i(x: int, a: str, b: int = 1) -> str:
+        def i(x: int, a: str = "", b: int = 1) -> str:
             """Test docstring."""
             raise NotImplementedError
 
-        LLMFunctionSpec.from_function(i)
+        LLMBoundSignature.from_call(i, (), {})
 
 
-def test_llm_function_spec_from_function_with_field():
-    # Use Pydantic's Field to specify a default value.
-    def f(llm: BaseLLM, a: str, b=Field(3)) -> str:
-        """Test docstring."""
-        raise NotImplementedError
-
-    llm_function_spec = LLMFunctionSpec.from_function(f)
-
-    assert llm_function_spec.input_model.schema() == create_model("Inputs", a=(str, ...), b=(int, 3)).schema()
-
-
-def test_llm_function_spec_from_function_with_field_description_no_default():
-    # Use Pydantic's Field to specify a description.
-    def f(llm: BaseLLM, a: str, b: int = Field(..., description="test")) -> str:
-        """Test docstring."""
-        raise NotImplementedError
-
-    llm_function_spec = LLMFunctionSpec.from_function(f)
-
-    assert llm_function_spec.input_model.schema() == {
-        'properties': {
-            'a': {'title': 'A', 'type': 'string'},
-            'b': {'description': 'test', 'title': 'B', 'type': 'integer'},
-        },
-        'required': ['a', 'b'],
-        'title': 'Inputs',
-        'type': 'object',
-    }
-
-
-def test_llm_function_spec_from_function_no_docstring():
-    def f(llm: BaseLLM, a: str, b: int = 1) -> str:
-        raise NotImplementedError
-
-    with pytest.raises(ValueError):
-        LLMFunctionSpec.from_function(f)
-
-
-def test_llm_function_spec_from_function_no_return_type():
-    def f(llm: BaseLLM, a: str, b: int = 1):
-        """Test docstring."""
-        raise NotImplementedError
-
-    with pytest.raises(ValueError):
-        LLMFunctionSpec.from_function(f)
-
-
-def test_llm_function_spec_from_function_no_parameter_annotation():
-    def f(llm: BaseLLM, a, b: int = 1) -> str:
-        """Test docstring."""
-        raise NotImplementedError
-
-    with pytest.raises(ValueError):
-        LLMFunctionSpec.from_function(f)
-
-
-def test_llm_function_spec_from_function_no_parameter_annotation_but_default():
-    def f(llm: BaseLLM, a=1, b: int = 1) -> str:
-        """Test docstring."""
-        raise NotImplementedError
-
-    llm_function_spec = LLMFunctionSpec.from_function(f)
-    assert llm_function_spec.input_model.schema() == create_model("Inputs", a=(int, 1), b=(int, 1)).schema()
-
-
-def test_llm_function_spec_from_call():
+def test_llm_bound_signature_from_call():
     def f(llm: BaseLLM, a: str, b: int = 1) -> str:
         """Test docstring."""
         raise NotImplementedError
 
-    llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), ("",), {})
-    assert llm_function_spec.docstring == "Test docstring."
-    assert llm_function_spec.signature == inspect.signature(f)
-    assert llm_function_spec.input_model.schema() == create_model("FInputs", a=(str, ...), b=(int, 1)).schema()
-    assert llm_function_spec.output_model.schema() == create_model("FOutputs", return_value=(str, ...)).schema()
+    llm_bound_signature = LLMBoundSignature.from_call(f, ("",), {})
+    assert llm_bound_signature.docstring == "Test docstring."
+    assert llm_bound_signature.signature == inspect.signature(f)
+    assert llm_bound_signature.input_type.schema() == create_model("FInputs", a=(str, ...), b=(int, 1)).schema()
+    assert llm_bound_signature.output_type.schema() == create_model("Output[str]", return_value=(str, ...)).schema()
 
 
 def test_llm_function_from_call_first_param():
@@ -229,7 +186,7 @@ def test_llm_function_from_call_first_param():
         """Test docstring."""
         raise NotImplementedError
 
-    assert LLMFunctionSpec.from_call(f, FakeLLM(), ("",), dict(b=1)).input_model.schema() == {
+    assert LLMBoundSignature.from_call(f, ("",), dict(b=1)).input_type.schema() == {
         'properties': {
             'a': {'title': 'A', 'type': 'string'},
             'b': {'title': 'B', 'type': 'integer', 'default': 1},
@@ -243,7 +200,7 @@ def test_llm_function_from_call_first_param():
         """Test docstring."""
         raise NotImplementedError
 
-    assert LLMFunctionSpec.from_call(g, FakeChatModel(), ("",), {}).input_model.schema() == {
+    assert LLMBoundSignature.from_call(g, ("",), {}).input_type.schema() == {
         'properties': {
             'a': {'title': 'A', 'type': 'string'},
             'b': {'title': 'B', 'type': 'integer', 'default': 1},
@@ -257,7 +214,7 @@ def test_llm_function_from_call_first_param():
         """Test docstring."""
         raise NotImplementedError
 
-    assert LLMFunctionSpec.from_call(h, UntrackedChatChain(FakeChatModel(), []), ("",), {}).input_model.schema() == {
+    assert LLMBoundSignature.from_call(h, ("",), {}).input_type.schema() == {
         'properties': {
             'a': {'title': 'A', 'type': 'string'},
             'b': {'title': 'B', 'type': 'integer', 'default': 1},
@@ -274,39 +231,39 @@ def test_llm_function_from_call_first_param():
             """Test docstring."""
             raise NotImplementedError
 
-        LLMFunctionSpec.from_call(i, 1, ("",), {})
+        LLMBoundSignature.from_call(i, ("",), {})
 
 
-def test_llm_function_spec_from_call_with_field():
+def test_llm_bound_signature_from_call_with_field():
     # Use Pydantic's Field to specify a default value.
     def f(llm: BaseLLM, a: str, b=Field(3)) -> str:
         """Test docstring."""
         raise NotImplementedError
 
-    llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), ("",), {})
+    llm_bound_signature = LLMBoundSignature.from_call(f, ("",), {})
 
-    assert llm_function_spec.input_model.schema() == create_model("FInputs", a=(str, ...), b=(int, 3)).schema()
+    assert llm_bound_signature.input_type.schema() == create_model("FInputs", a=(str, ...), b=(int, 3)).schema()
 
 
-def test_llm_function_spec_from_call_with_missing_default():
+def test_llm_bound_signature_from_call_with_missing_default():
     # Use Pydantic's Field to specify a description.
     def f(llm: BaseLLM, a: str, b: int = Field(..., description="test")) -> str:
         """Test docstring."""
         raise NotImplementedError
 
     with pytest.raises(TypeError, match=re.escape("missing a required argument: 'b'")):
-        LLMFunctionSpec.from_call(f, FakeLLM(), ("",), {})
+        LLMBoundSignature.from_call(f, ("",), {})
 
 
-def test_llm_function_spec_from_call_with_field_description_no_default():
+def test_llm_bound_signature_from_call_with_field_description_no_default():
     # Use Pydantic's Field to specify a description.
     def f(llm: BaseLLM, a: str, b: int = Field(..., description="test")) -> str:
         """Test docstring."""
         raise NotImplementedError
 
-    llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), ("",), dict(b=1))
+    llm_bound_signature = LLMBoundSignature.from_call(f, ("",), dict(b=1))
 
-    assert llm_function_spec.input_model.schema() == {
+    assert llm_bound_signature.input_type.schema() == {
         'properties': {
             'a': {'title': 'A', 'type': 'string'},
             'b': {'description': 'test', 'title': 'B', 'type': 'integer'},
@@ -317,33 +274,44 @@ def test_llm_function_spec_from_call_with_field_description_no_default():
     }
 
 
-def test_llm_function_spec_from_call_no_docstring():
+def test_llm_bound_signature_from_call_no_docstring():
     def f(llm: BaseLLM, a: str, b: int = 1) -> str:
         raise NotImplementedError
 
     with pytest.raises(ValueError):
-        LLMFunctionSpec.from_call(f, FakeLLM(), ("",), {})
+        LLMBoundSignature.from_call(f, ("",), {})
 
 
-def test_llm_function_spec_from_call_no_return_type():
+def test_llm_bound_signature_from_call_no_return_type():
     def f(llm: BaseLLM, a: str, b: int = 1):
         """Test docstring."""
         raise NotImplementedError
 
     with pytest.raises(ValueError):
-        LLMFunctionSpec.from_call(f, FakeLLM(), ("",), {})
+        LLMBoundSignature.from_call(f, ("",), {})
 
 
-def test_llm_function_spec_from_call_no_parameter_annotation_but_default():
+def test_llm_bound_signature_from_generic_call_to_none():
+    T = typing.TypeVar("T")
+
+    def f(llm: BaseLLM, a: T) -> T:
+        """Test docstring."""
+        raise NotImplementedError
+
+    with pytest.raises(ValueError):
+        LLMBoundSignature.from_call(f, (None,), {})
+
+
+def test_llm_bound_signature_from_call_no_parameter_annotation_but_default():
     def f(llm: BaseLLM, a=1, b: int = 1) -> str:
         """Test docstring."""
         raise NotImplementedError
 
-    llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), (), {})
-    assert llm_function_spec.input_model.schema() == create_model("FInputs", a=(int, 1), b=(int, 1)).schema()
+    llm_bound_signature = LLMBoundSignature.from_call(f, (), {})
+    assert llm_bound_signature.input_type.schema() == create_model("FInputs", a=(int, 1), b=(int, 1)).schema()
 
 
-def test_llm_function_spec_from_call_generic_input_outputs() -> None:
+def test_llm_bound_signature_from_call_generic_input_outputs() -> None:
     T = typing.TypeVar("T")
     V = typing.TypeVar("V")
 
@@ -358,16 +326,13 @@ def test_llm_function_spec_from_call_generic_input_outputs() -> None:
         """Test docstring."""
         raise NotImplementedError
 
-    llm_function_spec = LLMFunctionSpec.from_call(
-        f, FakeLLM(), (), dict(a=GenericType[int](value=0), b=GenericType[str](value=""))
+    llm_bound_signature = LLMBoundSignature.from_call(
+        f, (), dict(a=GenericType[int](value=0), b=GenericType[str](value=""))
     )
-    assert (
-        llm_function_spec.output_model.schema()
-        == create_model("FOutputs", return_value=(GenericType2[int, str], ...)).schema()
-    )
+    assert llm_bound_signature.output_type.schema() == Output[GenericType2[int, str]].schema()
 
 
-def test_llm_function_spec_from_call_generic_function() -> None:
+def test_llm_bound_signature_from_call_generic_function() -> None:
     T = typing.TypeVar("T")
     S = typing.TypeVar("S")
 
@@ -375,13 +340,11 @@ def test_llm_function_spec_from_call_generic_function() -> None:
         """Test docstring."""
         raise NotImplementedError
 
-    llm_function_spec = LLMFunctionSpec.from_call(f, FakeLLM(), (), dict(a=0, b=""))
-    assert (
-        llm_function_spec.output_model.schema() == create_model("FOutputs", return_value=(dict[int, str], ...)).schema()
-    )
+    llm_bound_signature = LLMBoundSignature.from_call(f, (), dict(a=0, b=""))
+    assert llm_bound_signature.output_type.schema() == Output[dict[int, str]].schema()
 
 
-def test_llm_function_spec_from_call_generic_input_outputs_full_remap() -> None:
+def test_llm_bound_signature_from_call_generic_input_outputs_full_remap() -> None:
     T = typing.TypeVar("T")
     S = typing.TypeVar("S")
 
@@ -399,16 +362,13 @@ def test_llm_function_spec_from_call_generic_input_outputs_full_remap() -> None:
         """Test docstring."""
         raise NotImplementedError
 
-    llm_function_spec = LLMFunctionSpec.from_call(
-        f, FakeLLM(), (), dict(a=GenericType[int](value=0), b=GenericType[str](value=""), c=GenericType[str](value=""))
+    llm_bound_signature = LLMBoundSignature.from_call(
+        f, (), dict(a=GenericType[int](value=0), b=GenericType[str](value=""), c=GenericType[str](value=""))
     )
-    assert (
-        llm_function_spec.output_model.schema()
-        == create_model("FOutputs", return_value=(GenericType2[int, str], ...)).schema()
-    )
+    assert llm_bound_signature.output_type.schema() == Output[GenericType2[int, str]].schema()
 
 
-def test_llm_function_spec_from_call_generic_input_outputs_multiple_remap() -> None:
+def test_llm_bound_signature_from_call_generic_input_outputs_multiple_remap() -> None:
     T = typing.TypeVar("T")
     S = typing.TypeVar("S")
 
@@ -425,21 +385,17 @@ def test_llm_function_spec_from_call_generic_input_outputs_multiple_remap() -> N
         """Test docstring."""
         raise NotImplementedError
 
-    llm_function_spec = LLMFunctionSpec.from_call(
+    llm_bound_signature = LLMBoundSignature.from_call(
         f,
-        FakeLLM(),
         (),
         dict(
             a=GenericType[int, int](), b=GenericType[int, str](), c=GenericType[str, str](), d=GenericType[int, int]()
         ),
     )
-    assert (
-        llm_function_spec.output_model.schema()
-        == create_model("FOutputs", return_value=(GenericType[int, str], ...)).schema()
-    )
+    assert llm_bound_signature.output_type.schema() == Output[GenericType[int, str]].schema()
 
 
-def test_llm_function_spec_from_call_generic_input_outputs_full_remap_failed() -> None:
+def test_llm_bound_signature_from_call_generic_input_outputs_full_remap_failed() -> None:
     T = typing.TypeVar("T")
     S = typing.TypeVar("S")
 
@@ -461,15 +417,14 @@ def test_llm_function_spec_from_call_generic_input_outputs_full_remap_failed() -
         ValueError,
         match=re.escape("Cannot resolve generic type ~V, conflicting resolution: <class 'str'> and <class 'float'>."),
     ):
-        LLMFunctionSpec.from_call(
+        LLMBoundSignature.from_call(
             f,
-            FakeLLM(),
             (),
             dict(a=GenericType[int](value=0), b=GenericType[str](value=""), c=GenericType[float](value=0.0)),
         )
 
 
-def test_llm_function_spec_get_generic_type_map() -> None:
+def test_get_generic_type_map() -> None:
     T = typing.TypeVar("T")
     S = typing.TypeVar("S")
 
@@ -482,25 +437,24 @@ def test_llm_function_spec_get_generic_type_map() -> None:
         value: T
         value2: S
 
-    assert LLMFunctionSpec.get_generic_type_map(GenericType) == {T: T, S: S}
-    assert LLMFunctionSpec.get_generic_type_map(GenericType[S, T]) == {T: S, S: T}
-    assert LLMFunctionSpec.get_generic_type_map(GenericType[S, T][U, V]) == {T: U, S: V}  # type: ignore
-    assert LLMFunctionSpec.get_generic_type_map(GenericType[S, T][U, V][X, X]) == {T: X, S: X}  # type: ignore
-    assert LLMFunctionSpec.get_generic_type_map(GenericType[U, U][X]) == {T: X, S: X}  # type: ignore
-    assert LLMFunctionSpec.get_generic_type_map(GenericType[int, U][str]) == {T: int, S: str}  # type: ignore
+    assert LLMStructuredPrompt.get_generic_type_map(GenericType) == {T: T, S: S}
+    assert LLMStructuredPrompt.get_generic_type_map(GenericType[S, T]) == {T: S, S: T}
+    assert LLMStructuredPrompt.get_generic_type_map(GenericType[S, T][U, V]) == {T: U, S: V}  # type: ignore
+    assert LLMStructuredPrompt.get_generic_type_map(GenericType[S, T][U, V][X, X]) == {T: X, S: X}  # type: ignore
+    assert LLMStructuredPrompt.get_generic_type_map(GenericType[U, U][X]) == {T: X, S: X}  # type: ignore
+    assert LLMStructuredPrompt.get_generic_type_map(GenericType[int, U][str]) == {T: int, S: str}  # type: ignore
 
 
-def test_llm_function_spec_resolve_generic_types() -> None:
+def test_resolve_generic_types() -> None:
     T = typing.TypeVar("T")
     S = typing.TypeVar("S")
 
-    def f(a: T, b: S) -> dict[T, S]:
-        """Test docstring."""
-        raise NotImplementedError
+    # Generic Pydantic model
+    class GenericType(GenericModel, typing.Generic[T, S]):
+        a: T
+        b: S
 
-    signature = inspect.signature(f)
-    parameter_items = list(signature.parameters.items())
-    assert LLMFunctionSpec.resolve_generic_types(parameter_items, dict(a=1, b="Hello")) == {
+    assert LLMStructuredPrompt.resolve_generic_types(GenericType, GenericType[int, str](a=1, b="Hello")) == {
         T: int,
         S: str,
     }
