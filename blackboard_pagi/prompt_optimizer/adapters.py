@@ -32,11 +32,11 @@ class LLMAsChatModel(BaseChatModel):
         for message in messages:
             if message.type == "human":
                 role = "user"
-            elif message.type == "Assistant":
+            elif message.type == "ai":
                 role = "assistant"
-            elif message.type == "System":
+            elif message.type == "system":
                 role = "system"
-            elif message.type == "Chat":
+            elif message.type == "chat":
                 assert isinstance(message, ChatMessage)
                 role = message.role.capitalize()
             else:
