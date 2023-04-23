@@ -2,26 +2,21 @@ from blackboard_pagi.utils.tracer import event_scope, trace_builder, trace_calls
 
 
 def test_trace():
-    with trace_builder(module_filters=__name__).scope() as builder:
+    with trace_builder(module_filters=__name__, stack_frame_context=0).scope() as builder:
         with event_scope("foo"):
             with event_scope("bar"):
                 with event_scope("baz"):
                     pass
 
     assert builder is not None
-    assert builder.build(include_timing=False)['event_tree'] == [
+    assert builder.build(include_timing=False, include_lineno=False)['event_tree'] == [
         {
             'delta_stack': [
                 {
-                    'code_context': [
-                        'def test_trace():\n',
-                        '    with ' 'trace_builder(module_filters=__name__).scope() ' 'as builder:\n',
-                        '        with event_scope("foo"):\n',
-                    ],
-                    'filename': 'blackboard_pagi.utils.tests.test_logger',
+                    'code_context': None,
                     'function': 'test_trace',
-                    'index': 1,
-                    'lineno': 5,
+                    'index': None,
+                    'module': 'blackboard_pagi.utils.tests.test_tracer',
                 }
             ],
             'event_id': 1,
@@ -31,15 +26,10 @@ def test_trace():
                 {
                     'delta_stack': [
                         {
-                            'code_context': [
-                                '    with ' 'trace_builder(module_filters=__name__).scope() ' 'as builder:\n',
-                                '        with ' 'event_scope("foo"):\n',
-                                '            with ' 'event_scope("bar"):\n',
-                            ],
-                            'filename': 'blackboard_pagi.utils.tests.test_logger',
+                            'code_context': None,
                             'function': 'test_trace',
-                            'index': 1,
-                            'lineno': 6,
+                            'index': None,
+                            'module': 'blackboard_pagi.utils.tests.test_tracer',
                         }
                     ],
                     'event_id': 2,
@@ -49,15 +39,10 @@ def test_trace():
                         {
                             'delta_stack': [
                                 {
-                                    'code_context': [
-                                        '        ' 'with ' 'event_scope("foo"):\n',
-                                        '            ' 'with ' 'event_scope("bar"):\n',
-                                        '                ' 'with ' 'event_scope("baz"):\n',
-                                    ],
-                                    'filename': 'blackboard_pagi.utils.tests.test_logger',
+                                    'code_context': None,
                                     'function': 'test_trace',
-                                    'index': 1,
-                                    'lineno': 7,
+                                    'index': None,
+                                    'module': 'blackboard_pagi.utils.tests.test_tracer',
                                 }
                             ],
                             'event_id': 3,
@@ -67,15 +52,10 @@ def test_trace():
                                 {
                                     'delta_stack': [
                                         {
-                                            'code_context': [
-                                                '            ' 'with ' 'event_scope("bar"):\n',
-                                                '                ' 'with ' 'event_scope("baz"):\n',
-                                                '                    ' 'pass\n',
-                                            ],
-                                            'filename': 'blackboard_pagi.utils.tests.test_logger',
+                                            'code_context': None,
                                             'function': 'test_trace',
-                                            'index': 1,
-                                            'lineno': 8,
+                                            'index': None,
+                                            'module': 'blackboard_pagi.utils.tests.test_tracer',
                                         }
                                     ],
                                     'event_id': 4,
@@ -99,25 +79,21 @@ def test_trace_calls():
 
     with trace_builder(
         module_filters=__name__,
+        stack_frame_context=0,
     ).scope() as builder:
         f(3)
         f(5)
 
     assert builder is not None
-    event_tree = builder.build(include_timing=False)['event_tree']
+    event_tree = builder.build(include_timing=False, include_lineno=False)['event_tree']
     assert event_tree == [
         {
             'delta_stack': [
                 {
-                    'code_context': [
-                        '\n',
-                        '    with ' 'trace_builder(module_filters=__name__, ' ').scope() as builder:\n',
-                        '        f(3)\n',
-                    ],
-                    'filename': 'blackboard_pagi.utils.tests.test_logger',
+                    'code_context': None,
                     'function': 'test_trace_calls',
-                    'index': 1,
-                    'lineno': 102,
+                    'index': None,
+                    'module': 'blackboard_pagi.utils.tests.test_tracer',
                 }
             ],
             'event_id': 1,
@@ -127,15 +103,10 @@ def test_trace_calls():
                 {
                     'delta_stack': [
                         {
-                            'code_context': [
-                                '    with ' 'trace_builder(module_filters=__name__, ' ').scope() as builder:\n',
-                                '        f(3)\n',
-                                '        f(5)\n',
-                            ],
-                            'filename': 'blackboard_pagi.utils.tests.test_logger',
+                            'code_context': None,
                             'function': 'test_trace_calls',
-                            'index': 1,
-                            'lineno': 103,
+                            'index': None,
+                            'module': 'blackboard_pagi.utils.tests.test_tracer',
                         }
                     ],
                     'event_id': 2,
@@ -146,11 +117,10 @@ def test_trace_calls():
                 {
                     'delta_stack': [
                         {
-                            'code_context': ['        f(3)\n', '        f(5)\n', '\n'],
-                            'filename': 'blackboard_pagi.utils.tests.test_logger',
+                            'code_context': None,
                             'function': 'test_trace_calls',
-                            'index': 1,
-                            'lineno': 104,
+                            'index': None,
+                            'module': 'blackboard_pagi.utils.tests.test_tracer',
                         }
                     ],
                     'event_id': 3,

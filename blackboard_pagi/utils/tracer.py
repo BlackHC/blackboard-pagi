@@ -135,18 +135,19 @@ class TraceBuilder:
     current_event_node: EventNode | None = None
     stopwatch: StopwatchContext = field(default_factory=StopwatchContext)
 
-    def build(self, include_timing: bool = True):
+    def build(self, include_timing: bool = True, include_lineno: bool = True):
         # convert everything to a JSON-compatible dict
         # unique_objects is already compatible
         # we only need to convert all tree nodes
         return {
             'unique_objects': self.unique_objects,
             'event_tree': [
-                self.convert_event_node(traces, include_timing=include_timing) for traces in self.event_root.sub_events
+                self.convert_event_node(traces, include_timing=include_timing, include_lineno=include_lineno)
+                for traces in self.event_root.sub_events
             ],
         }
 
-    def convert_event_node(self, node: EventNode, include_timing: bool = True):
+    def convert_event_node(self, node: EventNode, include_timing: bool = True, include_lineno: bool = True):
         converted: dict = {
             'name': node.name,
             'event_id': node.event_id,
@@ -156,14 +157,17 @@ class TraceBuilder:
             [
                 {
                     'module': f.module,
-                    'lineno': f.lineno,
                     'function': f.function,
                     'code_context': f.code_context,
                     'index': f.index,
                 }
+                | ({} if not include_lineno else {'lineno': f.lineno})
                 for f in node.delta_frame_infos
             ],
-            'sub_events': [self.convert_event_node(n, include_timing=include_timing) for n in node.sub_events],
+            'sub_events': [
+                self.convert_event_node(n, include_timing=include_timing, include_lineno=include_lineno)
+                for n in node.sub_events
+            ],
         }
         if include_timing:
             converted['start_time'] = node.start_time
