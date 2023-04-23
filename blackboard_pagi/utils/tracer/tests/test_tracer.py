@@ -16,7 +16,7 @@ def test_trace():
                     'code_context': None,
                     'function': 'test_trace',
                     'index': None,
-                    'module': 'blackboard_pagi.utils.tests.test_tracer',
+                    'module': 'blackboard_pagi.utils.tracer.tests.test_tracer',
                 }
             ],
             'event_id': 1,
@@ -29,7 +29,7 @@ def test_trace():
                             'code_context': None,
                             'function': 'test_trace',
                             'index': None,
-                            'module': 'blackboard_pagi.utils.tests.test_tracer',
+                            'module': 'blackboard_pagi.utils.tracer.tests.test_tracer',
                         }
                     ],
                     'event_id': 2,
@@ -42,7 +42,7 @@ def test_trace():
                                     'code_context': None,
                                     'function': 'test_trace',
                                     'index': None,
-                                    'module': 'blackboard_pagi.utils.tests.test_tracer',
+                                    'module': 'blackboard_pagi.utils.tracer.tests.test_tracer',
                                 }
                             ],
                             'event_id': 3,
@@ -55,7 +55,7 @@ def test_trace():
                                             'code_context': None,
                                             'function': 'test_trace',
                                             'index': None,
-                                            'module': 'blackboard_pagi.utils.tests.test_tracer',
+                                            'module': 'blackboard_pagi.utils.tracer.tests.test_tracer',
                                         }
                                     ],
                                     'event_id': 4,
@@ -93,7 +93,7 @@ def test_trace_calls():
                     'code_context': None,
                     'function': 'test_trace_calls',
                     'index': None,
-                    'module': 'blackboard_pagi.utils.tests.test_tracer',
+                    'module': 'blackboard_pagi.utils.tracer.tests.test_tracer',
                 }
             ],
             'event_id': 1,
@@ -106,12 +106,12 @@ def test_trace_calls():
                             'code_context': None,
                             'function': 'test_trace_calls',
                             'index': None,
-                            'module': 'blackboard_pagi.utils.tests.test_tracer',
+                            'module': 'blackboard_pagi.utils.tracer.tests.test_tracer',
                         }
                     ],
                     'event_id': 2,
                     'name': 'f',
-                    'properties': {'result': 9, 'value': 3},
+                    'properties': {'arguments': {'value': 3}, 'result': 9},
                     'sub_events': [],
                 },
                 {
@@ -120,12 +120,12 @@ def test_trace_calls():
                             'code_context': None,
                             'function': 'test_trace_calls',
                             'index': None,
-                            'module': 'blackboard_pagi.utils.tests.test_tracer',
+                            'module': 'blackboard_pagi.utils.tracer.tests.test_tracer',
                         }
                     ],
                     'event_id': 3,
                     'name': 'f',
-                    'properties': {'result': 15, 'value': 5},
+                    'properties': {'arguments': {'value': 5}, 'result': 15},
                     'sub_events': [],
                 },
             ],

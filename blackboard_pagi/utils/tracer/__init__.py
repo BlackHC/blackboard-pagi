@@ -1,7 +1,6 @@
 """
 Simple logger/execution tracker that uses tracks the stack frames and 'data'.
 """
-import dis
 import inspect
 import typing
 from contextlib import contextmanager
@@ -10,76 +9,11 @@ from dataclasses import dataclass, field
 from functools import partial, wraps
 from typing import ClassVar
 
-from blackboard_pagi.utils import module_filter
-from blackboard_pagi.utils.object_converter import ObjectConverter
 from blackboard_pagi.utils.stopwatch_context import StopwatchContext
+from blackboard_pagi.utils.tracer import module_filter
+from blackboard_pagi.utils.tracer.frame_info import FrameInfo, get_frame_infos
+from blackboard_pagi.utils.tracer.object_converter import ObjectConverter
 from blackboard_pagi.utils.weakrefs import WeakKeyIdMap
-
-
-@dataclass
-class FrameInfo:
-    """
-    A frame info object that is serializable.
-    """
-
-    module: str
-    lineno: int
-    function: str
-    code_context: list[str] | None
-    index: int | None
-    positions: dis.Positions | None = None
-
-
-def get_frame_infos(
-    num_top_frames_to_skip: int = 0,
-    num_bottom_frames_to_skip: int = 0,
-    module_filters: module_filter.ModuleFilters | None = None,
-    context: int = 3,
-) -> tuple[list[FrameInfo], int]:
-    # Get the current stack frame infos
-    frame_infos: list[inspect.FrameInfo] = inspect.stack(context=context)
-
-    # Get the stack frame infos for the delta stack summary
-    caller_frame_infos = frame_infos[num_top_frames_to_skip + 1 :]
-
-    stack_height = len(caller_frame_infos)
-
-    # remove bottom frames
-    relevant_inspect_frame_infos: list[inspect.FrameInfo] = caller_frame_infos[
-        : stack_height - num_bottom_frames_to_skip
-    ]
-
-    relevant_frame_infos: list[FrameInfo] = [
-        FrameInfo(
-            module=module.__name__ if (module := inspect.getmodule(f.frame)) else "<unknown>",
-            lineno=f.lineno,
-            function=f.function,
-            code_context=f.code_context,
-            index=f.index,
-            positions=f.positions,
-        )
-        for f in relevant_inspect_frame_infos
-    ]
-
-    # Filter the stack frame infos
-    if module_filters is not None:
-        relevant_frame_infos = [f for f in relevant_frame_infos if module_filters(f.module)]
-
-    return relevant_frame_infos, stack_height
-
-
-def test_get_frame_infos():
-    def f():
-        frame_infos = get_frame_infos(module_filters=module_filter.only_module(__name__))
-        assert len(frame_infos) == 3
-        assert frame_infos[0].function == "f"
-        assert frame_infos[1].function == "g"
-        assert frame_infos[2].function == "test_get_frame_infos"
-
-    def g():
-        f()
-
-    g()
 
 
 @dataclass
@@ -270,14 +204,11 @@ class TraceBuilder:
         elif isinstance(obj, dict):
             return {key: self.convert_object(value) for key, value in obj.items()}
         else:
-            # if the object is already in the map, we just return the name
+            # if the object is in the map, we return its name as a reference
             if obj in self.object_map:
-                return dict(ref=self.object_map[obj])
+                return dict(unique_object=self.object_map[obj])
             else:
-                # otherwise we register it and return its name
-                name = f"{type(obj).__name__}_{self.next_id()}"
-                self.register_object(obj, name, trace_object_converter(obj))
-                return dict(ref=name)
+                return trace_object_converter(obj)
 
     @classmethod
     def get_current(cls) -> 'TraceBuilder | None':
@@ -401,8 +332,10 @@ def trace_calls(
                     arguments = {arg: bound_args.arguments[arg] for arg in capture_args}
 
                 # anything that can be stored in a json is okay
+                converted_arguments = {}
                 for arg, value in arguments.items():
-                    properties[arg] = builder.convert_object(value)
+                    converted_arguments[arg] = builder.convert_object(value)
+                properties["arguments"] = converted_arguments
 
         # create event scope
         with builder.event_scope(name, properties, skip_frames=1):
@@ -416,6 +349,7 @@ def trace_calls(
             else:
                 if capture_return:
                     update_event_properties({"result": result})
-                return result
+
+        return result
 
     return wrapper

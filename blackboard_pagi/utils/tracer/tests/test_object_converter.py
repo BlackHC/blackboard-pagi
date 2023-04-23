@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pydantic
 
-from blackboard_pagi.utils.object_converter import ObjectConverter
+from blackboard_pagi.utils.tracer.object_converter import ObjectConverter
 
 
 def test_object_converter():

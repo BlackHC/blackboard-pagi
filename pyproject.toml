@@ -62,6 +62,8 @@ jax = {version = "^0.4.5", extras = ["cpu"]}
 llm-strategy = {version = ">=0.0.3"}
 markdown = "<3.4"
 pydantic = "^1.10.7"
+wandb = "^0.15.0"
+protobuf = ">=3.20.0,<3.21.0"
 
 [tool.poetry.extras]
 test = [
