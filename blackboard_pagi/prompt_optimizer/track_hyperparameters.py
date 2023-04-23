@@ -197,6 +197,7 @@ class HyperparameterContext:
             _hyperparameter_context = old_hyperparameter_context
 
 
+# TODO: replace with a context var
 _hyperparameter_context: HyperparameterContext | None = None
 
 
