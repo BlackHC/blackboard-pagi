@@ -1,7 +1,6 @@
 """
 Simple logger/execution tracker that uses tracks the stack frames and 'data'.
 """
-import enum
 import inspect
 import time
 import traceback
@@ -12,13 +11,11 @@ from dataclasses import dataclass, field
 from functools import partial, wraps
 from typing import ClassVar
 
-from pydantic import BaseModel
-from wandb.sdk.data_types import trace_tree
-
 from blackboard_pagi.utils.callable_wrapper import CallableWrapper
-from blackboard_pagi.utils.tracer import module_filter
+from blackboard_pagi.utils.tracer import module_filtering
 from blackboard_pagi.utils.tracer.frame_info import FrameInfo, get_frame_infos
 from blackboard_pagi.utils.tracer.object_converter import ObjectConverter
+from blackboard_pagi.utils.tracer.trace_schema import Trace, TraceNode, TraceNodeKind
 from blackboard_pagi.utils.weakrefs import WeakKeyIdMap
 
 T = typing.TypeVar("T")
@@ -33,101 +30,6 @@ def default_timer() -> int:
         The current time in milliseconds.
     """
     return int(time.time() * 1000)
-
-
-class TraceNodeKind(str, enum.Enum):
-    """
-    The type of event.
-
-    We match wandb's span kind for convienence and add more.
-    """
-
-    LLM = trace_tree.SpanKind.LLM
-    CHAIN = trace_tree.SpanKind.CHAIN
-    AGENT = trace_tree.SpanKind.AGENT
-    TOOL = trace_tree.SpanKind.TOOL
-    SCOPE = "SCOPE"
-    CALL = "CALL"
-    EVENT = "EVENT"
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}.{self.name}"
-
-
-class TraceNode(BaseModel):
-    """
-    Node in the trace tree.
-    """
-
-    kind: TraceNodeKind
-    name: str | None
-    event_id: int
-
-    start_time_ms: int
-    end_time_ms: int
-
-    delta_frame_infos: list[FrameInfo]
-
-    properties: dict[str, object]
-    children: list['TraceNode']
-
-    def to_custom_dict(self, include_timing: bool = True, include_lineno: bool = True):
-        custom_dict = {
-            "kind": self.kind.value,
-            "name": self.name,
-            "event_id": self.event_id,
-            "delta_frame_infos": [
-                {
-                    "module": frame_info.module,
-                    "function": frame_info.function,
-                    "code_context": frame_info.code_context,
-                }
-                | ({"lineno": frame_info.lineno} if include_lineno else {})
-                for frame_info in self.delta_frame_infos
-            ],
-            "properties": self.properties,
-            "children": [
-                child.to_custom_dict(include_timing=include_timing, include_lineno=include_lineno)
-                for child in self.children
-            ],
-        }
-        if include_timing:
-            custom_dict["start_time_ms"] = self.start_time_ms
-            custom_dict["end_time_ms"] = self.end_time_ms
-
-        return custom_dict
-
-
-class Trace(BaseModel):
-    """
-    A trace tree.
-    """
-
-    name: str | None
-    traces: list[TraceNode]
-    properties: dict[str, object]
-    unique_objects: dict[str, object]
-
-    def to_custom_dict(self, include_timing: bool = True, include_lineno: bool = True):
-        """
-        Convert the trace to a jsonable format.
-
-        Args:
-            include_timing: Whether to include timing information.
-            include_lineno: Whether to include line number information.
-
-        Returns:
-            The jsonable trace.
-        """
-        return {
-            "name": self.name,
-            "traces": [
-                trace.to_custom_dict(include_timing=include_timing, include_lineno=include_lineno)
-                for trace in self.traces
-            ],
-            "properties": self.properties,
-            "unique_objects": self.unique_objects,
-        }
 
 
 @dataclass
@@ -160,7 +62,7 @@ class TraceNodeBuilder:
         )
 
     def get_delta_frame_infos(
-        self, num_frames_to_skip: int = 0, module_filters: module_filter.ModuleFilters | None = None, context=3
+        self, num_frames_to_skip: int = 0, module_filters: module_filtering.ModuleFilters | None = None, context=3
     ):
         frame_infos, full_stack_height = get_frame_infos(
             num_top_frames_to_skip=num_frames_to_skip + 1,
@@ -192,7 +94,7 @@ trace_module_filters = None
 class TraceBuilder:
     _current: ClassVar[ContextVar['TraceBuilder | None']] = ContextVar("current_trace_builder", default=None)
 
-    module_filters: module_filter.ModuleFilters
+    module_filters: module_filtering.ModuleFilters
     stack_frame_context: int
 
     event_root: TraceNodeBuilder = field(default_factory=TraceNodeBuilder.create_root)
@@ -353,7 +255,7 @@ class TraceBuilder:
         self.current_event_node.name = name
 
 
-def trace_builder(module_filters: module_filter.ModuleFiltersSpecifier | None = None, stack_frame_context: int = 3):
+def trace_builder(module_filters: module_filtering.ModuleFiltersSpecifier | None = None, stack_frame_context: int = 3):
     """
     Context manager that allows to trace our program execution.
     """
@@ -361,7 +263,7 @@ def trace_builder(module_filters: module_filter.ModuleFiltersSpecifier | None = 
         module_filters = trace_module_filters
 
     return TraceBuilder(
-        module_filters=module_filter.module_filters(module_filters), stack_frame_context=stack_frame_context
+        module_filters=module_filtering.module_filters(module_filters), stack_frame_context=stack_frame_context
     )
 
 

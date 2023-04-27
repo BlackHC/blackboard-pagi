@@ -1,9 +1,6 @@
-from .module_filter import module_filters, module_prefix, only_module
+from .module_filtering import module_filters, module_prefix, only_module
 from .trace_builder import (
-    Trace,
     TraceBuilder,
-    TraceNode,
-    TraceNodeKind,
     add_event,
     event_scope,
     register_object,
@@ -14,4 +11,5 @@ from .trace_builder import (
     update_event_properties,
     update_name,
 )
+from .trace_schema import Trace, TraceNode, TraceNodeKind
 from .wandb_integration import wandb_build_trace_trees, wandb_tracer

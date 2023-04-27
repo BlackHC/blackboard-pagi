@@ -2,7 +2,7 @@ import dis
 import inspect
 from dataclasses import dataclass
 
-from blackboard_pagi.utils.tracer import module_filter
+from blackboard_pagi.utils.tracer import module_filtering
 
 
 @dataclass
@@ -22,7 +22,7 @@ class FrameInfo:
 def get_frame_infos(
     num_top_frames_to_skip: int = 0,
     num_bottom_frames_to_skip: int = 0,
-    module_filters: module_filter.ModuleFilters | None = None,
+    module_filters: module_filtering.ModuleFilters | None = None,
     context: int = 3,
 ) -> tuple[list[FrameInfo], int]:
     # Get the current stack frame infos
@@ -59,7 +59,7 @@ def get_frame_infos(
 
 def test_get_frame_infos():
     def f():
-        frame_infos = get_frame_infos(module_filters=module_filter.only_module(__name__))
+        frame_infos = get_frame_infos(module_filters=module_filtering.only_module(__name__))
         assert len(frame_infos) == 3
         assert frame_infos[0].function == "f"
         assert frame_infos[1].function == "g"

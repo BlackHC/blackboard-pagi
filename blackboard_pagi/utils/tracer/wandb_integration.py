@@ -3,7 +3,13 @@ from contextlib import contextmanager
 import wandb.sdk.wandb_run
 from wandb.sdk.data_types import trace_tree
 
-from blackboard_pagi.utils.tracer import Trace, TraceNode, TraceNodeKind, module_filter, trace_builder  # type: ignore
+from blackboard_pagi.utils.tracer import (  # type: ignore
+    Trace,
+    TraceNode,
+    TraceNodeKind,
+    module_filtering,
+    trace_builder,
+)
 
 
 def convert_event_kind_str(kind: TraceNodeKind):
@@ -68,7 +74,7 @@ def wandb_build_trace_trees(trace: Trace):
 def wandb_tracer(
     name: str | None,
     *,
-    module_filters: module_filter.ModuleFiltersSpecifier | None = None,
+    module_filters: module_filtering.ModuleFiltersSpecifier | None = None,
     stack_frame_context: int = 3,
 ):
     tb = trace_builder(module_filters=module_filters, stack_frame_context=stack_frame_context)  # type: ignore
