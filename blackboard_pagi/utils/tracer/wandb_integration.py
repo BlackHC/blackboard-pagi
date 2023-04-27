@@ -1,34 +1,36 @@
+from contextlib import contextmanager
+
+import wandb.sdk.wandb_run
 from wandb.sdk.data_types import trace_tree
 
-from blackboard_pagi.utils.tracer import EventNode, TraceBuilder
-
-NAME_PREFIX_TO_SPAN_KIND = {
-    "llm:": trace_tree.SpanKind.LLM,
-    "chain:": trace_tree.SpanKind.CHAIN,
-    "agent:": trace_tree.SpanKind.AGENT,
-    "tool:": trace_tree.SpanKind.TOOL,
-}
+from blackboard_pagi.utils.tracer import Trace, TraceNode, TraceNodeKind, module_filter, trace_builder  # type: ignore
 
 
-def convert_name(name: str | None) -> tuple[str, trace_tree.SpanKind | str]:
-    if name is None:
-        name = ""
+def convert_event_kind_str(kind: TraceNodeKind):
+    try:
+        span_kind = trace_tree.SpanKind(kind.value)
+    except ValueError:
+        span_kind = trace_tree.SpanKind.AGENT
 
-    for prefix, span_kind in NAME_PREFIX_TO_SPAN_KIND.items():
-        if name.startswith(prefix):
-            return name[len(prefix) :], span_kind
-
-    return name, "SCOPE"
+    return span_kind
 
 
-def build_span(node: EventNode):
+def convert_result(result: object):
+    if result is None:
+        return None
+    if isinstance(result, dict | list | set):
+        return result
+    return [result]
+
+
+def build_span(node: TraceNode):
     span = trace_tree.Span()
-    span_name, span_kind = convert_name(node.name)
-    span.name = span_name
-    span.span_kind = span_kind
+    span.span_id = node.event_id
+    span.name = node.name if node.name is not None else ''
+    span.span_kind = convert_event_kind_str(node.kind)
 
-    span.start_time_ms = node.start_time
-    span.end_time_ms = node.end_time
+    span.start_time_ms = node.start_time_ms
+    span.end_time_ms = node.end_time_ms
 
     if "exception" not in node.properties:
         span.status_code = trace_tree.StatusCode.SUCCESS
@@ -36,20 +38,44 @@ def build_span(node: EventNode):
         span.status_code = trace_tree.StatusCode.ERROR
         span.status_message = repr(node.properties["exception"])
 
-    span.add_named_result(node.properties.get('arguments', {}), node.properties.get('result', {}))
+    span.add_named_result(node.properties.get('arguments', {}), convert_result(node.properties.get('result', None)))
 
-    attributes = dict(node.properties)
-    if "arguments" in attributes:
-        del attributes["arguments"]
-    if "result" in attributes:
-        del attributes["result"]
+    properties = dict(node.properties)
+    if "arguments" in properties:
+        del properties["arguments"]
+    if "result" in properties:
+        del properties["result"]
 
-    span.attributes = attributes
-    span.child_spans = [build_span(child) for child in node.sub_events]
+    span.attributes = dict(
+        properties=properties,
+        delta_stack=node.delta_frame_infos,
+    )
+    span.child_spans = [build_span(child) for child in node.children]
     return span
 
 
-def build_trace_tree(trace_builder: TraceBuilder):
-    root_span = build_span(trace_builder.event_root)
-    media = trace_tree.WBTraceTree(root_span=root_span, model_dict=trace_builder.unique_objects)
-    return media
+def wandb_build_trace_trees(trace: Trace):
+    media_list = []
+    for trace_instance in trace.traces:
+        scope_span = build_span(trace_instance)
+
+        media = trace_tree.WBTraceTree(root_span=scope_span, model_dict=trace.unique_objects)
+        media_list.append(media)
+    return media_list
+
+
+@contextmanager
+def wandb_tracer(
+    name: str | None,
+    *,
+    module_filters: module_filter.ModuleFiltersSpecifier | None = None,
+    stack_frame_context: int = 3,
+):
+    tb = trace_builder(module_filters=module_filters, stack_frame_context=stack_frame_context)  # type: ignore
+    try:
+        with tb.scope(name) as builder:
+            yield builder
+    finally:
+        for trace_artifact in wandb_build_trace_trees(builder.build()):
+            wandb.log({"trace": trace_artifact})  # type: ignore
+        wandb.finish()  # type: ignore
