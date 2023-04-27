@@ -1,86 +1,271 @@
 """Welcome to Pynecone! This file outlines the steps to create a basic app."""
+import pprint  # noqa: F401
+from enum import Enum
+
 import pynecone as pc
+import pynecone.pc as cli
 from pcconfig import config
 from trace_viewer.flame_graph import FlameGraphNode, flame_graph
+from trace_viewer.json_view import json_view
 
-from blackboard_pagi.utils.tracer import Trace, TraceNode
+from blackboard_pagi.utils.tracer import Trace, TraceNode, TraceNodeKind
 
 docs_url = "https://pynecone.io/docs/getting-started/introduction"
 filename = f"{config.app_name}/{config.app_name}.py"
 
 
-class State(pc.State):
-    """The app state."""
+# solarized colors as HTML hex
+# https://ethanschoonover.com/solarized/
+class SolarizedColors(str, Enum):
+    base03 = "#002b36"
+    base02 = "#073642"
+    base01 = "#586e75"
+    base00 = "#657b83"
+    base0 = "#839496"
+    base1 = "#93a1a1"
+    base2 = "#eee8d5"
+    base3 = "#fdf6e3"
+    yellow = "#b58900"
+    orange = "#cb4b16"
+    red = "#dc322f"
+    magenta = "#d33682"
+    violet = "#6c71c4"
+    blue = "#268bd2"
+    cyan = "#2aa198"
+    green = "#859900"
 
-    pass
+
+class NodeInfo(pc.Base):
+    node_name: str
+    kind: TraceNodeKind
+    event_id: int
+    start_time_ms: int
+    end_time_ms: int
+    # delta_frame_infos: list[dict[str, object]]
+    properties: object | None
+    exception: object | None
+    self_object: object | None
+    result: object | None
+    arguments: object | None
+
+
+class Wrapper(pc.Base):
+    inner: object = None
+
+    def __init__(self, inner):
+        super().__init__(inner=inner)
 
 
 def load_trace():
     return Trace.parse_file('optimization_unit_trace_example.json')
 
 
+def convert_trace_node_kind_to_color(kind: TraceNodeKind):
+    if kind == TraceNodeKind.SCOPE:
+        return SolarizedColors.base1
+    elif kind == TraceNodeKind.AGENT:
+        return SolarizedColors.green
+    elif kind == TraceNodeKind.LLM:
+        return SolarizedColors.blue
+    elif kind == TraceNodeKind.CHAIN:
+        return SolarizedColors.cyan
+    elif kind == TraceNodeKind.CALL:
+        return SolarizedColors.yellow
+    elif kind == TraceNodeKind.EVENT:
+        return SolarizedColors.orange
+    elif kind == TraceNodeKind.TOOL:
+        return SolarizedColors.magenta
+    else:
+        return SolarizedColors.base2
+
+
+def convert_node_to_color(node: TraceNode):
+    if "exception" in node.properties:
+        return SolarizedColors.red
+    else:
+        return "black"
+
+
 def convert_trace_to_flame_graph_data(trace: Trace) -> dict:
-    def convert_node(node: TraceNode) -> FlameGraphNode:
+    def convert_node(node: TraceNode, discount=1.0) -> FlameGraphNode:
+        children = []
+        last_ms = node.start_time_ms
+        for child in node.children:
+            gap_s = child.start_time_ms - last_ms
+            if gap_s > 0:
+                children.append(
+                    FlameGraphNode(
+                        name="",
+                        background_color="#00000000",
+                        value=gap_s,
+                        children=[],
+                    )
+                )
+            children.append(convert_node(child, discount=discount * 0.95))
+            last_ms = child.end_time_ms
+
+        duration_s = node.end_time_ms - node.start_time_ms
         return FlameGraphNode(
+            id=str(node.event_id),
             name=node.name,
-            value=(node.end_time_ms - node.start_time_ms) / 1000,
-            children=[convert_node(child) for child in node.children],
+            value=duration_s * discount,
+            children=children,
+            background_color=convert_trace_node_kind_to_color(node.kind),
+            color=convert_node_to_color(node),
         )
 
-    return convert_node(trace.traces[0]).dict()
+    converted_node = convert_node(trace.traces[0]).dict(exclude_unset=True)
+    return converted_node
+
+
+class State(pc.State):
+    """The app state."""
+
+    flame_graph_data: dict = dict(name="root", value=1, children=[])
+    current_node: list[NodeInfo] = []
+    _trace: Trace | None = None
+    _event_id_map: dict[int, TraceNode] = dict()
+
+    def load_flame_graph(self):
+        self._trace = load_trace()
+        self._event_id_map = self._trace.build_event_id_map()
+        self.flame_graph_data = convert_trace_to_flame_graph_data(self._trace)
+
+    def update_current_node(self, chart_data: dict):
+        node_id = chart_data["source"].get("id", None)
+        if node_id is None:
+            return
+
+        event_id = int(node_id)
+
+        trace_node = self._event_id_map[event_id]
+
+        properties = trace_node.properties.copy()
+        exception = properties.pop("exception", None)
+        arguments = properties.pop("arguments", None)
+        result = properties.pop("result", None)
+        if arguments:
+            assert isinstance(arguments, dict)
+            arguments = arguments.copy()
+            self_object = arguments.pop("self", None)
+        else:
+            self_object = None
+
+        optional_properties = properties if properties else None
+        self.current_node = [
+            NodeInfo(
+                node_name=trace_node.name,
+                kind=trace_node.kind,
+                event_id=trace_node.event_id,
+                start_time_ms=trace_node.start_time_ms,
+                end_time_ms=trace_node.end_time_ms,
+                properties=optional_properties,
+                exception=exception,
+                self_object=self_object,
+                result=result,
+                arguments=arguments,
+            )
+        ]
+
+
+def render_node_info(node_info: NodeInfo):
+    """Renders node_info as a simple table."""
+    header_style = dict(width="20%", text_align="right", vertical_align="top")
+
+    return pc.table_container(
+        pc.table(
+            pc.tbody(
+                pc.tr(
+                    pc.th("Name", style=header_style),
+                    pc.td(node_info.node_name, colspan=0),
+                ),
+                pc.tr(
+                    pc.th("", style=header_style),
+                    pc.td(
+                        pc.stat_group(
+                            pc.stat(
+                                pc.stat_number(node_info.kind),
+                                pc.stat_help_text("KIND"),
+                            ),
+                            pc.stat(
+                                pc.stat_number((node_info.end_time_ms - node_info.start_time_ms) / 1000),
+                                pc.stat_help_text("DURATION (S)"),
+                            ),
+                            width="100%",
+                        )
+                    ),
+                ),
+                pc.cond(
+                    node_info.exception,
+                    pc.tr(
+                        pc.th("Exception", style=header_style),
+                        pc.td(json_view(data=node_info.exception), colspan=0),
+                    ),
+                ),
+                pc.cond(
+                    node_info.arguments,
+                    pc.tr(
+                        pc.th("Arguments", style=header_style),
+                        pc.td(json_view(data=node_info.arguments), colspan=0),
+                    ),
+                ),
+                pc.cond(
+                    node_info.self_object,
+                    pc.tr(
+                        pc.th("Self", style=header_style),
+                        pc.td(json_view(data=node_info.self_object), colspan=0),
+                    ),
+                ),
+                pc.cond(
+                    node_info.result,
+                    pc.tr(
+                        pc.th("Result", style=header_style),
+                        pc.td(json_view(data=node_info.result), colspan=0),
+                    ),
+                ),
+                pc.cond(
+                    node_info.properties,
+                    pc.tr(
+                        pc.th("Properties", style=header_style),
+                        pc.td(json_view(data=node_info.properties), colspan=0),
+                    ),
+                ),
+            ),
+            variant="simple",
+        ),
+        style=dict(width=1024),
+    )
 
 
 def index() -> pc.Component:
     return pc.center(
         pc.vstack(
-            pc.heading("Welcome to Pynecone!", font_size="2em"),
-            pc.box("Get started by editing ", pc.code(filename, font_size="1em")),
-            pc.link(
-                "Check out our docs!",
-                href=docs_url,
-                border="0.1em solid",
-                padding="0.5em",
-                border_radius="0.5em",
-                _hover={
-                    "color": "rgb(107,99,246)",
-                },
-            ),
+            pc.heading("Trace Viewer", level=1),
             flame_graph(
-                width=800,
-                height=400,
-                data=convert_trace_to_flame_graph_data(load_trace()),
-                # {
-                #     "name": "root",
-                #     "value": 5,
-                #     "children": [
-                #         {
-                #             "name": "custom tooltip",
-                #             "value": 1,
-                #             "tooltip": "Custom tooltip shown on hover"
-                #         },
-                #         {
-                #             "name": "custom colors",
-                #             "backgroundColor": "#35f",
-                #             "color": "#fff",
-                #             "value": 3,
-                #             "children": [
-                #                 {
-                #                     "name": "leaf",
-                #                     "value": 2
-                #                 }
-                #             ]
-                #         }
-                #     ]
-                # }
+                width=1024,
+                height=100,
+                data=State.flame_graph_data,
+                on_change=lambda data: State.update_current_node(data),  # type: ignore
             ),
-            spacing="1.5em",
-            font_size="2em",
+            pc.foreach(
+                State.current_node,
+                render_node_info,
+            ),
         ),
-        padding_top="10%",
+        padding_top="64px",
+        padding_bottom="64px",
     )
 
 
 # Add state and page to the app.
-app = pc.App(state=State)
-app.add_page(index)
+app = pc.App(
+    state=State,
+    stylesheets=[
+        'react-json-view-lite.css',
+    ],
+)
+app.add_page(index, on_load=State.load_flame_graph)
 app.compile()
+
+if __name__ == "__main__":
+    cli.main()

@@ -7,8 +7,9 @@ class FlameGraphNode(BaseModel):
     value: int
     children: list["FlameGraphNode"]
     color: str | None = None
-    background_color: str | None = Field(None, alias="backgroundColor")
+    backgroundColor: str | None = Field(None, alias="background_color")
     tooltip: str | None = None
+    id: str | None = None
 
 
 class FlameGraph(pc.Component):

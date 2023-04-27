@@ -6,5 +6,7 @@ config = pc.Config(
     env=pc.Env.DEV,
     frontend_packages=[
         "react-flame-graph",
+        "react-object-view",
+        "react-json-view-lite",
     ],
 )
