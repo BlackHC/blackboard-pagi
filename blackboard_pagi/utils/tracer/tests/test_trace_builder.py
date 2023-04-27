@@ -1,8 +1,8 @@
-from blackboard_pagi.utils.tracer import event_scope, trace_builder, trace_calls
+from blackboard_pagi.utils.tracer import build_trace, event_scope, trace_calls
 
 
 def test_trace():
-    with trace_builder(module_filters=__name__, stack_frame_context=0).scope() as builder:
+    with build_trace(module_filters=__name__, stack_frame_context=0).scope() as builder:
         with event_scope("foo"):
             with event_scope("bar"):
                 with event_scope("baz"):
@@ -77,7 +77,7 @@ def test_trace_calls():
     def f(value: int):
         return value * 3
 
-    with trace_builder(
+    with build_trace(
         module_filters=__name__,
         stack_frame_context=0,
     ).scope() as builder:

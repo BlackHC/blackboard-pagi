@@ -22,6 +22,8 @@ from pydantic.generics import replace_types
 
 from blackboard_pagi.prompt_optimizer.track_hyperparameters import Hyperparameter, track_hyperparameters
 from blackboard_pagi.prompts.chat_chain import ChatChain
+from blackboard_pagi.utils.tracer import TraceNodeKind, trace_calls, update_event_properties, update_name
+from blackboard_pagi.utils.tracer.trace_builder import slicer
 
 T = typing.TypeVar("T")
 S = typing.TypeVar("S")
@@ -345,6 +347,7 @@ class LLMStructuredPrompt(typing.Generic[B, T]):
             raise ValueError(f"Could not find base generic type {base_generic_name} for {field_type}.")
         return base_generic_type
 
+    @trace_calls(name="LLMStructuredPrompt", kind=TraceNodeKind.CHAIN, capture_args=False, capture_return=False)
     def __call__(
         self,
         language_model_or_chat_chain: BaseLanguageModel | ChatChain,
@@ -365,10 +368,18 @@ class LLMStructuredPrompt(typing.Generic[B, T]):
             Hyperparameter("json_schema") @ get_json_schema_hyperparameters(schema),
         )
 
+        update_event_properties(
+            dict(
+                arguments=dict(self.input),
+            )
+        )
+
         parsed_output = self.query(language_model_or_chat_chain, schema)
 
         print(f"Input: {self.input.json(indent=1)}")
         print(f"Output: {json.dumps(parsed_output.dict()['return_value'], indent=1)}")
+
+        update_event_properties(dict(result=parsed_output.return_value))
 
         return parsed_output.return_value  # type: ignore
 
@@ -565,7 +576,7 @@ class LLMBoundSignature:
 
         model_spec = LLMBoundSignature.field_tuples_to_model_spec(parameter_dict)
         if generic_parameters:
-            bases = (pydantic.generics.GenericModel, typing.Generic[*generic_parameters])
+            bases = (pydantic.generics.GenericModel, typing.Generic[*generic_parameters])  # type: ignore
             input_type = create_model(f"{class_name}Inputs", __base__=bases, __module__=f.__module__, **model_spec)
         else:
             input_type = create_model(f"{class_name}Inputs", __module__=f.__module__, **model_spec)  # type: ignore
@@ -682,7 +693,6 @@ class LLMFunctionInterface(typing.Generic[P, T], typing.Callable[P, T]):  # type
         raise NotImplementedError
 
 
-@dataclass
 class LLMFunction(LLMFunctionInterface[P, T], typing.Generic[P, T]):
     """
     A callable that can be called with a chat model.
@@ -710,6 +720,7 @@ class LLMFunction(LLMFunctionInterface[P, T], typing.Generic[P, T]):
 
         return self(language_model_or_chat_chain, **dict(input_object))
 
+    @trace_calls(kind=TraceNodeKind.CHAIN, capture_return=slicer[1:], capture_args=True)
     def __call__(
         self,
         language_model_or_chat_chain: BaseLanguageModel | ChatChain,
@@ -717,6 +728,7 @@ class LLMFunction(LLMFunctionInterface[P, T], typing.Generic[P, T]):
         **kwargs: P.kwargs,
     ) -> T:
         """Call the function."""
+        update_name(self.__name__)
 
         # check that the first argument is an instance of BaseLanguageModel
         # or a TrackedChatChain or UntrackedChatChain
@@ -736,7 +748,6 @@ class LLMFunction(LLMFunctionInterface[P, T], typing.Generic[P, T]):
         return return_value  # type: ignore
 
 
-@dataclass
 class LLMExplicitFunction(LLMFunctionInterface[P, T], typing.Generic[P, T]):  # type: ignore
     """
     A callable that can be called with a chat model.
@@ -785,8 +796,11 @@ class LLMExplicitFunction(LLMFunctionInterface[P, T], typing.Generic[P, T]):  # 
     def __getattr__(self, item):
         return getattr(self.__wrapped__, item)
 
+    @trace_calls(kind=TraceNodeKind.CHAIN, capture_return=True, capture_args=slicer[1:])
     def __call__(self, language_model_or_chat_chain: BaseLanguageModel | ChatChain, input: BaseModel) -> T:
         """Call the function."""
+        update_name(self.__name__)
+
         # check that the first argument is an instance of BaseLanguageModel
         # or a TrackedChatChain or UntrackedChatChain
         if not isinstance(language_model_or_chat_chain, BaseLanguageModel | ChatChain):
@@ -846,7 +860,10 @@ def llm_explicit_function(f: F_types) -> F_types:
         if not is_not_implemented(f):
             raise ValueError("The function must not be implemented.")
 
-        specific_llm_function = track_hyperparameters(functools.wraps(f)(LLMExplicitFunction()))
+        specific_llm_function = track_hyperparameters(
+            functools.wraps(f)(LLMExplicitFunction()),
+        )
+
     return typing.cast(F_types, specific_llm_function)
 
 
@@ -877,7 +894,10 @@ def llm_function(f: F_types) -> F_types:
         if not is_not_implemented(f):
             raise ValueError("The function must not be implemented.")
 
-        specific_llm_function = track_hyperparameters(functools.wraps(f)(LLMFunction()))
+        specific_llm_function = track_hyperparameters(
+            functools.wraps(f)(LLMFunction()),
+        )
+
     return typing.cast(F_types, specific_llm_function)
 
 

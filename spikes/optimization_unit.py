@@ -2,6 +2,7 @@
 Spike for a meta-loop that optimizes the prompt templates we use.
 """
 import functools
+import traceback
 import typing
 from dataclasses import dataclass
 from typing import Generic, TypeVar
@@ -11,12 +12,21 @@ from langchain import OpenAI
 from langchain.cache import SQLiteCache
 from langchain.chat_models import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
+from langchain.schema import OutputParserException
+from openai import OpenAIError
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
+import wandb
 from blackboard_pagi.cached_chat_model import CachedChatOpenAI
+from blackboard_pagi.prompt_optimizer.adapters import LLMAsChatModel
 from blackboard_pagi.prompt_optimizer.llm_function import LLMFunction, llm_explicit_function, llm_function
-from blackboard_pagi.prompt_optimizer.track_execution import LangchainInterface, get_tracked_chats, track_langchain
+from blackboard_pagi.prompt_optimizer.track_execution import (
+    LangchainInterface,
+    TrackedChatModel,
+    get_tracked_chats,
+    track_langchain,
+)
 from blackboard_pagi.prompt_optimizer.track_hyperparameters import (
     Hyperparameters,
     HyperparametersBuilder,
@@ -24,11 +34,20 @@ from blackboard_pagi.prompt_optimizer.track_hyperparameters import (
     track_hyperparameters,
 )
 from blackboard_pagi.prompts.chat_chain import ChatChain
+from blackboard_pagi.utils.tracer import build_trace
+from blackboard_pagi.utils.tracer.wandb_integration import wandb_tracer
 
 langchain.llm_cache = SQLiteCache(".optimization_unit.langchain.db")
 
 chat_model = ChatOpenAI(model_name="gpt-4", request_timeout=240, max_tokens=1024, model_kwargs=dict(temperature=0.1))
+chat_model = TrackedChatModel(chat_model=chat_model)
+# simpler_llm = OpenAI(model_name="gpt-3.5-turbo-0301", request_timeout=240, max_tokens=1024, model_kwargs=dict(temperature=0.1))
+# simpler_chat_model = LLMAsChatModel(llm=simpler_llm)
 # chat_model = ChatOpenAI(max_tokens=512, model_kwargs=dict(temperature=0.5))
+simpler_chat_model = ChatOpenAI(
+    model_name="gpt-3.5-turbo-0301", request_timeout=240, max_tokens=1024, model_kwargs=dict(temperature=0.1)
+)
+simpler_chat_model = TrackedChatModel(chat_model=simpler_chat_model)
 
 text_model = OpenAI(
     model_name="text-davinci-003",
@@ -55,7 +74,10 @@ class TaskRun(GenericModel, Generic[T_TaskParameters, T_TaskResults, T_Hyperpara
     )
     all_chat_chains: list[dict] = Field(..., description="The chat chains from the task execution.")
     # all_prompts: dict[str, str] = Field(..., description="The prompts and outputs from the task execution.")
-    return_value: T_TaskResults = Field(..., description="The results of the task.")
+    return_value: T_TaskResults | None = Field(
+        ..., description="The results of the task. (None for exceptions/failure.)"
+    )
+    exception: str | None = Field(..., description="Exception that occurred during the task execution.")
 
 
 class TaskReflection(BaseModel):
@@ -227,20 +249,30 @@ def capture_task_run(
     tracked_chat_model = track_langchain(llm_interface)
 
     structured_prompt = task_executor.llm_bound_signature(**dict(task_parameters)).structured_prompt
+
+    exception = None
+    return_value = None
     with hyperparameters_scope(hyperparameters) as scope:
-        return_value = task_executor.explicit(llm_interface, task_parameters)
+        try:
+            return_value = task_executor.explicit(llm_interface, task_parameters)
+        except (OpenAIError, OutputParserException) as e:
+            # convert the exception to a string and include a bit of context
+            # so we can debug it later
+            exception = traceback.format_exception_only(e)
 
     return TaskRun[structured_prompt.input_type, structured_prompt.return_annotation, type(scope.hyperparameters)](
         task_parameters=task_parameters,
         hyperparameters=scope.hyperparameters,
         all_chat_chains=get_tracked_chats(tracked_chat_model),
         return_value=return_value,
+        exception=exception,
     )
 
 
 @track_hyperparameters
 def optimize_hyperparameters(
     chat_model: BaseChatModel,
+    task_chat_model: BaseChatModel,
     task_executor,
     seed_task_runs: list[TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]],
 ) -> OptimizationStep[T_TaskParameters, T_TaskResults, T_Hyperparameters]:
@@ -248,6 +280,7 @@ def optimize_hyperparameters(
     Optimize the hyperparameters.
     """
 
+    task_root_chain = ChatChain(task_chat_model, [])
     root_chain = ChatChain(chat_model, [])
 
     llm_bound_signature = task_executor.llm_bound_signature(**dict(seed_task_runs[0].task_parameters))
@@ -276,14 +309,14 @@ def optimize_hyperparameters(
     )
 
     optimization_step = None
-    for _ in range(3):
+    for _ in range(1):
         optimization_step = LLMOptimizer.suggest_next_optimization_step(root_chain, optimization_info)
 
         optimization_info.best_hyperparameters = optimization_step.best_hyperparameters
 
         for task_parameters in optimization_step.task_parameters_suggestions:
             for hyperparameters in optimization_step.hyperparameter_suggestions:
-                task_run = capture_task_run(root_chain, task_executor, task_parameters, hyperparameters)
+                task_run = capture_task_run(task_root_chain, task_executor, task_parameters, hyperparameters)
                 task_info = TaskInfo[
                     llm_bound_signature.input_type, llm_bound_signature.return_annotation, type(hyperparameters)
                 ](
@@ -348,24 +381,35 @@ essay_topics = [
     "Deconstructing the Notion of Free Will: A Multidisciplinary Analysis of Human Agency",
 ]
 
-#%%
+# %%
 
-seed_task_runs = [
-    capture_task_run(
-        ChatChain(chat_model, []),
-        create_essay_topics,
-        create_essay_topics.get_input_object(domain="comedy", n=2),
-        BaseModel(),
-    )
-    for topic in essay_topics[:2]
-]
+wandb.init(project="blackboard-pagi", name="optimization_unit_spike")
 
-all_hyperparameters = Hyperparameters.merge(task_run.hyperparameters for task_run in seed_task_runs)
+with wandb_tracer("BBO", module_filters="blackboard_pagi.*", stack_frame_context=0) as trace_builder:
+    seed_task_runs = [
+        capture_task_run(
+            ChatChain(simpler_chat_model, []),
+            create_essay_topics,
+            create_essay_topics.get_input_object(domain="comedy", n=2),
+            BaseModel(),
+        )
+        for topic in essay_topics[:2]
+    ]
 
-# Update seed task runs with the hyperparameters we found.
-for task_run in seed_task_runs:
-    task_run.hyperparameters = all_hyperparameters
+    all_hyperparameters = Hyperparameters.merge(task_run.hyperparameters for task_run in seed_task_runs)
 
-#%%
+    # Update seed task runs with the hyperparameters we found.
+    for task_run in seed_task_runs:
+        task_run.hyperparameters = all_hyperparameters
 
-optimization_step = optimize_hyperparameters(chat_model, create_essay_topics, seed_task_runs)
+    # %%
+
+    optimization_step = optimize_hyperparameters(chat_model, simpler_chat_model, create_essay_topics, seed_task_runs)
+
+# save builder.build() as json file
+
+json_trace = trace_builder.build().dict()
+import json
+
+with open("optimization_unit_trace_ada.json", "w") as f:
+    json.dump(json_trace, f)

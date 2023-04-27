@@ -2,12 +2,12 @@ from dataclasses import dataclass
 
 import pydantic
 
-from blackboard_pagi.utils.tracer.object_converter import ObjectConverter
+from blackboard_pagi.utils.tracer.object_converter import DynamicObjectConverter, ObjectConverter
 
 
 def test_object_converter():
     # create an ObjectConverter
-    converter = ObjectConverter()
+    converter = DynamicObjectConverter()
 
     # add a converter for a dataclass
     @dataclass
@@ -18,7 +18,7 @@ def test_object_converter():
     # Check that a vanilla dataclass is converted automatically
     assert converter(Test(1, '2')) == {'a': 1, 'b': '2'}
 
-    def convert_test(converter: ObjectConverter, test: Test):
+    def convert_test(test: Test, converter: ObjectConverter):
         return {'a': test.a + 1, 'b': test.b}
 
     converter.register_converter(convert_test, Test)
@@ -35,18 +35,11 @@ def test_object_converter():
     # convert a Pydantic model
     assert converter(TestModel(a=1, b='2')) == {'a': 1, 'b': '2'}
 
-    class TestModel2(pydantic.BaseModel):
-        a: int
-        b: str
-
-    # does not convert a Pydantic model by default
-    assert converter(TestModel2(a=1, b='2')) == repr(TestModel2(a=1, b='2'))
-
     # convert a dict
     assert converter({'a': 1, 'b': '2'}) == {'a': 1, 'b': '2'}
 
     # convert an object that is not a dict, dataclass, or Pydantic model
-    assert converter(TestModel2) == repr(TestModel2)
+    assert converter(TestModel) == repr(TestModel)
 
     # convert a list
     assert converter([1, 2, 3]) == [1, 2, 3]

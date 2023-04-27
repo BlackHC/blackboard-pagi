@@ -1,6 +1,7 @@
 import dis
 import inspect
-from dataclasses import dataclass
+
+from pydantic.dataclasses import dataclass
 
 from blackboard_pagi.utils.tracer import module_filtering
 

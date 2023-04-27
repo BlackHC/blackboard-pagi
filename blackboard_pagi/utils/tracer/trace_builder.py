@@ -11,15 +11,29 @@ from dataclasses import dataclass, field
 from functools import partial, wraps
 from typing import ClassVar
 
+from langchain.schema import BaseMessage
+
 from blackboard_pagi.utils.callable_wrapper import CallableWrapper
 from blackboard_pagi.utils.tracer import module_filtering
 from blackboard_pagi.utils.tracer.frame_info import FrameInfo, get_frame_infos
-from blackboard_pagi.utils.tracer.object_converter import ObjectConverter
+from blackboard_pagi.utils.tracer.object_converter import (
+    DynamicObjectConverter,
+    ObjectConverter,
+    convert_pydantic_model,
+)
 from blackboard_pagi.utils.tracer.trace_schema import Trace, TraceNode, TraceNodeKind
 from blackboard_pagi.utils.weakrefs import WeakKeyIdMap
 
 T = typing.TypeVar("T")
 P = typing.ParamSpec("P")
+
+
+trace_object_converter = DynamicObjectConverter()
+trace_module_filters = None
+
+# TODO: move this somewhere else?
+# chat messages need to be converted to JSON
+trace_object_converter.register_converter(convert_pydantic_model, BaseMessage)
 
 
 def default_timer() -> int:
@@ -84,10 +98,6 @@ class TraceNodeBuilder:
             properties=self.properties,
             children=[sub_event.build() for sub_event in self.children],
         )
-
-
-trace_object_converter = ObjectConverter()
-trace_module_filters = None
 
 
 @dataclass
@@ -192,25 +202,15 @@ class TraceBuilder:
         self.object_map[obj] = name
         self.unique_objects[name] = properties
 
-    def convert_object(self, obj: object):
-        # anything that is not JSON compatible is converted to a unique object with a name
-        # and a set of properties that can be serialized using the object converter
-        if isinstance(obj, (int, float, str, bool, type(None))):
-            return obj
-        elif isinstance(obj, list):
-            return [self.convert_object(item) for item in obj]
-        elif isinstance(obj, tuple):
-            return tuple(self.convert_object(item) for item in obj)
-        elif isinstance(obj, set):
-            return {self.convert_object(item) for item in obj}
-        elif isinstance(obj, dict):
-            return {key: self.convert_object(value) for key, value in obj.items()}
-        else:
-            # if the object is in the map, we return its name as a reference
-            if obj in self.object_map:
-                return dict(unique_object=self.object_map[obj])
-            else:
-                return trace_object_converter(obj)
+    def convert_object(self, obj: object, preferred_object_converter: ObjectConverter | None = None):
+        if preferred_object_converter is None:
+            preferred_object_converter = self.convert_object
+
+        # if the object is in the map, we return its name as a reference
+        if obj in self.object_map:
+            return dict(unique_object=self.object_map[obj])
+
+        return trace_object_converter(obj, preferred_object_converter)
 
     @classmethod
     def get_current(cls) -> 'TraceBuilder | None':
@@ -255,67 +255,6 @@ class TraceBuilder:
         self.current_event_node.name = name
 
 
-def trace_builder(module_filters: module_filtering.ModuleFiltersSpecifier | None = None, stack_frame_context: int = 3):
-    """
-    Context manager that allows to trace our program execution.
-    """
-    if not module_filters:
-        module_filters = trace_module_filters
-
-    return TraceBuilder(
-        module_filters=module_filtering.module_filters(module_filters), stack_frame_context=stack_frame_context
-    )
-
-
-def add_event(name: str, properties: dict[str, object] | None = None, kind: TraceNodeKind = TraceNodeKind.EVENT):
-    """
-    Add an event to the current scope.
-    """
-    current = TraceBuilder.get_current()
-    if current is not None:
-        current.add_event(name, properties, kind)
-
-
-def register_object(obj: object, name: str, properties: dict[str, object]):
-    """
-    Register an object as unique, so that it will be serialized only once.
-    """
-    current = TraceBuilder.get_current()
-    if current is not None:
-        current.register_object(obj, name, properties)
-
-
-def update_event_properties(properties: dict[str, object] | None = None, /, **kwargs):
-    """
-    Update the properties of the current event.
-    """
-    current = TraceBuilder.get_current()
-    if current is not None:
-        current.update_event_properties(properties, **kwargs)
-
-
-def update_name(name: str):
-    """
-    Update the name of the current event.
-    """
-    current = TraceBuilder.get_current()
-    if current is not None:
-        current.update_name(name)
-
-
-@contextmanager
-def event_scope(name: str, properties: dict[str, object] | None = None, kind: TraceNodeKind = TraceNodeKind.SCOPE):
-    """
-    Context manager that allows to trace our program execution.
-    """
-    current = TraceBuilder.get_current()
-    if current is None:
-        yield
-    else:
-        with current.event_scope(name, properties=properties, kind=kind, skip_frames=2):
-            yield
-
-
 @dataclass
 class CallTracer(typing.Callable[P, T], typing.Generic[P, T], CallableWrapper):  # type: ignore
     __signature__: inspect.Signature
@@ -323,7 +262,8 @@ class CallTracer(typing.Callable[P, T], typing.Generic[P, T], CallableWrapper): 
     __wrapped_name__: str
     __kind__: TraceNodeKind = TraceNodeKind.CALL
     __capture_return__: bool = False
-    __capture_args__: bool | list[str] = False
+    __capture_args__: bool | list[str] | slice = False
+    __object_converter__: DynamicObjectConverter | None = None
 
     def __call__(self, *args, **kwargs):
         # check if we are in a trace
@@ -331,21 +271,29 @@ class CallTracer(typing.Callable[P, T], typing.Generic[P, T], CallableWrapper): 
         if builder is None:
             return self.__wrapped__(*args, **kwargs)
 
+        object_converter = self.__object_converter__
+        if object_converter is None:
+            object_converter = builder.convert_object
+
         # build properties
         properties = {}
-        if self.__capture_args__:
+        if self.__capture_args__ is not False:
             # bind the arguments to the signature
             bound_args = self.__signature__.bind(*args, **kwargs)
             # add the arguments to the properties
             if self.__capture_args__ is True:
                 arguments = bound_args.arguments
-            else:
+            elif isinstance(self.__capture_args__, list):
                 arguments = {arg: bound_args.arguments[arg] for arg in self.__capture_args__}
+            elif isinstance(self.__capture_args__, slice):
+                arguments = {
+                    arg: bound_args.arguments[arg] for arg in list(bound_args.arguments)[self.__capture_args__]
+                }
 
             # anything that can be stored in a json is okay
             converted_arguments = {}
             for arg, value in arguments.items():
-                converted_arguments[arg] = builder.convert_object(value)
+                converted_arguments[arg] = object_converter(value)
             properties["arguments"] = converted_arguments
 
         # create event scope
@@ -354,8 +302,16 @@ class CallTracer(typing.Callable[P, T], typing.Generic[P, T], CallableWrapper): 
             result = self.__wrapped__(*args, **kwargs)
 
             if self.__capture_return__:
-                update_event_properties({"result": builder.convert_object(result)})
+                builder.current_event_node.properties.update({"result": object_converter(result)})
         return result
+
+
+class Slicer:
+    def __class_getitem__(cls, item):
+        return item
+
+
+slicer = Slicer
 
 
 def trace_calls(
@@ -364,7 +320,8 @@ def trace_calls(
     name: str | None = None,
     kind: TraceNodeKind = TraceNodeKind.CALL,
     capture_return: bool = False,
-    capture_args: bool | list[str] = False,
+    capture_args: bool | list[str] | slice = False,
+    object_converter: DynamicObjectConverter | None = None,
 ):
     """
     Decorator that allows to trace our program execution.
@@ -403,6 +360,7 @@ def trace_calls(
             __kind__=kind,
             __capture_return__=capture_return,
             __capture_args__=capture_args,
+            __object_converter__=object_converter,
         )
     )
 

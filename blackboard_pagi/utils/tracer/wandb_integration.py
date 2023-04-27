@@ -3,13 +3,7 @@ from contextlib import contextmanager
 import wandb.sdk.wandb_run
 from wandb.sdk.data_types import trace_tree
 
-from blackboard_pagi.utils.tracer import (  # type: ignore
-    Trace,
-    TraceNode,
-    TraceNodeKind,
-    module_filtering,
-    trace_builder,
-)
+from blackboard_pagi.utils.tracer import Trace, TraceNode, TraceNodeKind, build_trace, module_filtering  # type: ignore
 
 
 def convert_event_kind_str(kind: TraceNodeKind):
@@ -31,7 +25,7 @@ def convert_result(result: object):
 
 def build_span(node: TraceNode):
     span = trace_tree.Span()
-    span.span_id = node.event_id
+    span.span_id = str(node.event_id)
     span.name = node.name if node.name is not None else ''
     span.span_kind = convert_event_kind_str(node.kind)
 
@@ -44,7 +38,9 @@ def build_span(node: TraceNode):
         span.status_code = trace_tree.StatusCode.ERROR
         span.status_message = repr(node.properties["exception"])
 
-    span.add_named_result(node.properties.get('arguments', {}), convert_result(node.properties.get('result', None)))
+    span.add_named_result(
+        node.properties.get('arguments', {}), convert_result(node.properties.get('result', None))  # type: ignore
+    )
 
     properties = dict(node.properties)
     if "arguments" in properties:
@@ -77,7 +73,7 @@ def wandb_tracer(
     module_filters: module_filtering.ModuleFiltersSpecifier | None = None,
     stack_frame_context: int = 3,
 ):
-    tb = trace_builder(module_filters=module_filters, stack_frame_context=stack_frame_context)  # type: ignore
+    tb = build_trace(module_filters=module_filters, stack_frame_context=stack_frame_context)  # type: ignore
     try:
         with tb.scope(name) as builder:
             yield builder

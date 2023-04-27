@@ -42,6 +42,18 @@ class TraceNode(BaseModel):
     properties: dict[str, object]
     children: list['TraceNode']
 
+    def collect_event_id_map(self, event_id_map=None) -> dict[int, 'TraceNode']:
+        """
+        Update a map from event id to node.
+        """
+        if event_id_map is None:
+            event_id_map = {}
+
+        event_id_map[self.event_id] = self
+        for child in self.children:
+            child.collect_event_id_map(event_id_map)
+        return event_id_map
+
     def to_custom_dict(self, include_timing: bool = True, include_lineno: bool = True):
         custom_dict = {
             "kind": self.kind.value,
@@ -78,6 +90,15 @@ class Trace(BaseModel):
     traces: list[TraceNode]
     properties: dict[str, object]
     unique_objects: dict[str, object]
+
+    def build_event_id_map(self) -> dict[int, TraceNode]:
+        """
+        Build a map from event id to node.
+        """
+        event_id_map: dict[int, TraceNode] = {}
+        for trace in self.traces:
+            trace.collect_event_id_map(event_id_map)
+        return event_id_map
 
     def to_custom_dict(self, include_timing: bool = True, include_lineno: bool = True):
         """

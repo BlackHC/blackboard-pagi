@@ -1,7 +1,6 @@
 import dataclasses
 import functools
 import string
-import types
 import typing
 import warnings
 from collections import defaultdict
@@ -11,6 +10,8 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo, Undefined, UndefinedType
 from pydantic.typing import NoArgAnyCallable
+
+from blackboard_pagi.utils.callable_wrapper import CallableWrapper
 
 if typing.TYPE_CHECKING:
     from pydantic.typing import AbstractSetIntStr, MappingIntStrAny
@@ -312,7 +313,7 @@ _hyperparameters_builder: HyperparametersBuilder | None = None
 
 
 @dataclass
-class TrackedFunction(typing.Callable[P, T], typing.Generic[P, T]):  # type: ignore
+class TrackedFunction(typing.Callable[P, T], typing.Generic[P, T], CallableWrapper):  # type: ignore
     """
     A callable that can be called with a chat model.
     """
@@ -328,17 +329,6 @@ class TrackedFunction(typing.Callable[P, T], typing.Generic[P, T]):  # type: ign
         )
 
         return tracked_function
-
-    def __get__(self, instance: object, owner: type | None = None) -> typing.Callable:
-        """Support instance methods."""
-        if instance is None:
-            return self
-
-        # Bind self to instance as MethodType
-        return types.MethodType(self, instance)
-
-    def __getattr__(self, item):
-        return getattr(self.__wrapped__, item)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
         if _hyperparameters_builder is None:

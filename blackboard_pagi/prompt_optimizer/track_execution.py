@@ -7,6 +7,9 @@ from langchain.schema import BaseLanguageModel, BaseMessage, ChatMessage, ChatRe
 from pydantic import BaseModel, Field
 
 from blackboard_pagi.prompts.chat_chain import ChatChain
+from blackboard_pagi.utils.tracer import TraceNodeKind, trace_calls
+from blackboard_pagi.utils.tracer.object_converter import ObjectConverter
+from blackboard_pagi.utils.tracer.trace_builder import trace_object_converter
 
 T = typing.TypeVar("T")
 P = typing.ParamSpec("P")
@@ -120,7 +123,8 @@ class TrackedLLM(BaseLLM):
     llm: BaseLLM
     tracked_prompts: PromptTree = Field(default_factory=PromptTree.create_root)
 
-    def __call__(self, prompt: str, stop: Optional[List[str]] = None, track: bool = False) -> str:
+    @trace_calls(name='TrackedLLM', kind=TraceNodeKind.LLM, capture_args=True, capture_return=True)
+    def __call__(self, prompt: str, stop: Optional[List[str]] = None) -> str:
         node = self.tracked_prompts.insert(prompt)
         response = self.llm(prompt, stop)
         node.insert(response)
@@ -134,13 +138,14 @@ class TrackedLLM(BaseLLM):
 
     @property
     def _llm_type(self) -> str:
-        return self._llm_type
+        return self.llm._llm_type
 
 
 class TrackedChatModel(BaseChatModel):
     chat_model: BaseChatModel
     tracked_chats: ChatTree = Field(default_factory=ChatTree.create_root)
 
+    @trace_calls(name='TrackedChatModel', kind=TraceNodeKind.LLM, capture_args=True, capture_return=True)
     def __call__(self, messages: List[BaseMessage], stop: Optional[List[str]] = None) -> BaseMessage:
         response_message = self.chat_model(messages, stop)
         self.tracked_chats.insert(messages + [response_message])
@@ -183,3 +188,18 @@ def get_tracked_chats(chat_model_or_chat_chain: ChatChain | TrackedChatModel) ->
     else:
         raise ValueError(f"Unknown language model type {type(chat_model_or_chat_chain)}")
     return model.tracked_chats.build_compact_dict()["children"]
+
+
+@trace_object_converter.register_converter()
+def _convert_llm(llm: BaseLLM, converter: ObjectConverter) -> dict:
+    return converter(llm.dict(), converter)  # type: ignore
+
+
+@trace_object_converter.register_converter()
+def _convert_chat_model(chat_model: BaseChatModel, converter: ObjectConverter) -> dict:
+    return dict(_type=chat_model.__class__.__name__)
+
+
+@trace_object_converter.register_converter()
+def _convert_tracked_chat_model(chat_model: TrackedChatModel, converter: ObjectConverter) -> dict:
+    return dict(_type=chat_model.chat_model__class__.__name__)

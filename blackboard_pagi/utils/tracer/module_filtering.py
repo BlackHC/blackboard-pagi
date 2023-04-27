@@ -15,6 +15,14 @@ class OnlyModuleFilter:
 
     module_name: str
 
+    def __init__(self, module: ModuleSpecifier):
+        if isinstance(module, str):
+            self.module_name = module
+        elif isinstance(module, types.ModuleType):
+            self.module_name = module.__name__
+        else:
+            raise ValueError(f"Unknown module type {type(module)}")
+
     def __call__(self, target_module_name: str):
         return target_module_name == self.module_name
 
@@ -27,32 +35,16 @@ class ModulePrefixFilter:
 
     module_name_prefix: str
 
+    def __init__(self, module_prefix: ModuleSpecifier):
+        if isinstance(module_prefix, str):
+            self.module_name_prefix = module_prefix
+        elif isinstance(module_prefix, types.ModuleType):
+            self.module_name_prefix = module_prefix.__name__
+        else:
+            raise ValueError(f"Unknown module type {type(module_prefix)}")
+
     def __call__(self, target_module_name: str):
         return target_module_name.startswith(self.module_name_prefix)
-
-
-def only_module(module: ModuleSpecifier):
-    """
-    Creates a filter for the given module.
-    """
-    if isinstance(module, str):
-        return OnlyModuleFilter(module)
-    elif isinstance(module, types.ModuleType):
-        return OnlyModuleFilter(module.__name__)
-    else:
-        raise ValueError(f"Unknown module type {type(module)}")
-
-
-def module_prefix(module_prefix: ModuleSpecifier):
-    """
-    Creates a filter for the given module prefix.
-    """
-    if isinstance(module_prefix, str):
-        return ModulePrefixFilter(module_prefix)
-    elif isinstance(module_prefix, types.ModuleType):
-        return ModulePrefixFilter(module_prefix.__name__)
-    else:
-        raise ValueError(f"Unknown module type {type(module_prefix)}")
 
 
 def module_filter(module: ModuleSpecifier):

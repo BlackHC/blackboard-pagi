@@ -8,9 +8,34 @@ import pydantic
 
 T = typing.TypeVar("T")
 
+ObjectConverter: typing.TypeAlias = typing.Callable[[typing.Any, typing.Optional['ObjectConverter']], typing.Any]
+
+
+@typing.no_type_check
+def simple_object_converter(obj: typing.Any, preferred_converter: ObjectConverter | None = None) -> typing.Any:
+    if preferred_converter is None:
+        preferred_converter = simple_object_converter
+
+    if isinstance(obj, pydantic.BaseModel):
+        return convert_pydantic_model(obj, preferred_converter)
+    elif not isinstance(obj, type) and dataclasses.is_dataclass(obj):
+        return {preferred_converter(f.name): preferred_converter(getattr(obj, f.name)) for f in dataclasses.fields(obj)}
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    elif isinstance(obj, tuple):
+        return tuple(preferred_converter(v) for v in obj)
+    elif isinstance(obj, list):
+        return [preferred_converter(v) for v in obj]
+    elif isinstance(obj, set):
+        return {preferred_converter(v) for v in obj}
+    elif isinstance(obj, dict):
+        return {preferred_converter(k): preferred_converter(v) for k, v in obj.items()}
+
+    return repr(obj)
+
 
 @dataclass
-class ObjectConverter:
+class DynamicObjectConverter:
     """
     A class that converts objects to JSON dicts or strings.
     By default, only literals, tuples, lists, sets, dicts and dataclasses are converted.
@@ -19,28 +44,29 @@ class ObjectConverter:
     Additional classes can be added with the `add_converter` decorator.
     """
 
-    converters: dict[type, typing.Callable[['ObjectConverter', typing.Any], dict]] = field(default_factory=dict)
+    default_converter: ObjectConverter = simple_object_converter
+    converters: dict[type, typing.Callable[[typing.Any, ObjectConverter], typing.Any] | None] = field(
+        default_factory=dict
+    )
 
-    def __call__(self, obj: object):
-        if type(obj) in self.converters:
-            return self.converters[type(obj)](self, obj)
-        elif isinstance(obj, (str, int, float, bool, type(None))):
-            return obj
-        elif isinstance(obj, tuple):
-            return tuple(self(v) for v in obj)
-        elif isinstance(obj, list):
-            return [self(v) for v in obj]
-        elif isinstance(obj, set):
-            return {self(v) for v in obj}
-        elif isinstance(obj, dict):
-            return {self(k): self(v) for k, v in obj.items()}
-        elif not isinstance(obj, type) and dataclasses.is_dataclass(obj):
-            return {self(f.name): self(getattr(obj, f.name)) for f in dataclasses.fields(obj)}
+    def __call__(self, obj: object, preferred_converter: ObjectConverter | None = None):
+        if preferred_converter is None:
+            preferred_converter = self
 
-        return repr(obj)
+        for t in reversed(self.converters):
+            if not isinstance(obj, t):
+                continue
+
+            converter = self.converters[t]
+            if converter is not None:
+                return converter(obj, preferred_converter)
+            else:
+                return f'{obj.__class__.__module__}:{obj.__class__.__qualname__} @ {hex(id(obj))}'
+
+        return self.default_converter(obj, preferred_converter)  # type: ignore
 
     def register_converter(
-        self, func: typing.Callable[['ObjectConverter', T], dict] | None = None, type_: type[T] | None = None
+        self, func: typing.Callable[[T, ObjectConverter], dict] | None = None, type_: type[T] | None = None
     ):
         """
         Registers a converter for a type.
@@ -75,14 +101,14 @@ class ObjectConverter:
 
         return func
 
-    def add_converter(self, func: typing.Callable[['ObjectConverter', T], dict] | None = None):
+    def add_converter(self, func: typing.Callable[[T, ObjectConverter], dict] | None = None):
         """
         Decorator that adds a converter to the ObjectConverter class that is wrapped.
         """
 
         def wrapper(type_: type):
             if func is None:
-                # Check if type_ is a Pydanitc model
+                # Check if type_ is a Pydantic model
                 if isinstance(type_, type) and issubclass(type_, pydantic.BaseModel):
                     # Add a converter for the model
                     self.register_converter(convert_pydantic_model, type_)
@@ -97,9 +123,12 @@ class ObjectConverter:
         return wrapper
 
 
-def convert_pydantic_model(converter: ObjectConverter, obj: pydantic.BaseModel) -> dict:
+def convert_pydantic_model(obj: pydantic.BaseModel, converter: ObjectConverter | None = None) -> dict:
     """
     Converts a pydantic model to a dict.
     """
+    if converter is None:
+        converter = convert_pydantic_model
+
     # Iterate over the fields of the model
-    return {f.name: converter(getattr(obj, f.name)) for f in obj.__fields__.values()}
+    return {f.name: converter(getattr(obj, f.name)) for f in obj.__fields__.values()}  # type: ignore
