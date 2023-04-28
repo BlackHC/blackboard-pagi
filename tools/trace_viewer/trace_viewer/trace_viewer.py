@@ -1,5 +1,6 @@
 """Welcome to Pynecone! This file outlines the steps to create a basic app."""
 import pprint  # noqa: F401
+import typing
 from enum import Enum
 
 import pynecone as pc
@@ -56,8 +57,15 @@ class Wrapper(pc.Base):
         super().__init__(inner=inner)
 
 
-def load_trace():
+def load_example_trace():
     return Trace.parse_file('optimization_unit_trace_example.json')
+
+
+# streaming_trace: Trace | None = None
+#
+# async def update_trace(trace: Trace):
+#     streaming_trace = trace
+#     # trigger update in state
 
 
 def convert_trace_node_kind_to_color(kind: TraceNodeKind):
@@ -114,22 +122,44 @@ def convert_trace_to_flame_graph_data(trace: Trace) -> dict:
             color=convert_node_to_color(node),
         )
 
-    converted_node = convert_node(trace.traces[0]).dict(exclude_unset=True)
+    converted_node = convert_node(trace.traces[-1]).dict(exclude_unset=True)
     return converted_node
 
 
 class State(pc.State):
     """The app state."""
 
-    flame_graph_data: dict = dict(name="root", value=1, children=[])
+    flame_graph_data: dict = FlameGraphNode(name="", value=1, background_color="#00000000", children=[]).dict()
     current_node: list[NodeInfo] = []
     _trace: Trace | None = None
     _event_id_map: dict[int, TraceNode] = dict()
 
-    def load_flame_graph(self):
-        self._trace = load_trace()
-        self._event_id_map = self._trace.build_event_id_map()
-        self.flame_graph_data = convert_trace_to_flame_graph_data(self._trace)
+    def reset_graph(self):
+        self._trace = None
+        self.update_flame_graph()
+
+    def load_default_flame_graph(self):
+        self._trace = load_example_trace()
+        self.update_flame_graph()
+
+    async def handle_trace_upload(self, file: pc.UploadFile):
+        """Handle the upload of a file.
+
+        Args:
+            file: The uploaded file.
+        """
+        upload_data = await file.read()
+        self._trace = Trace.parse_raw(upload_data)
+        self.update_flame_graph()
+
+    def update_flame_graph(self):
+        if self._trace is None:
+            self.flame_graph_data = FlameGraphNode(name="", value=1, background_color="#00000000", children=[]).dict()
+            self._event_id_map = {}
+        else:
+            self._event_id_map = self._trace.build_event_id_map()
+            self.flame_graph_data = convert_trace_to_flame_graph_data(self._trace)
+        self.current_node = []
 
     def update_current_node(self, chart_data: dict):
         node_id = chart_data["source"].get("id", None)
@@ -237,10 +267,33 @@ def render_node_info(node_info: NodeInfo):
     )
 
 
+@typing.no_type_check
 def index() -> pc.Component:
     return pc.center(
         pc.vstack(
-            pc.heading("Trace Viewer", level=1),
+            pc.span(
+                pc.heading("Trace Viewer", level=1, style=dict(display="inline-block", margin_right="16px")),
+                pc.popover(
+                    pc.popover_trigger(pc.button(pc.icon(tag="hamburger"), style=dict(vertical_align="top"))),
+                    pc.popover_content(
+                        pc.popover_header("Choose Trace Source"),
+                        pc.popover_body(
+                            pc.button("Load Example", on_click=State.load_default_flame_graph),
+                            pc.divider(margin="0.5em"),
+                            pc.upload(
+                                pc.text("Drag and drop files here or click to select trace json file."),
+                                border="1px dotted",
+                                padding="2em",
+                            ),
+                            pc.button("Load", on_click=lambda: State.handle_trace_upload(pc.upload_files())),
+                            pc.divider(margin="0.5em"),
+                            pc.button("Reset", on_click=State.reset_graph),
+                        ),
+                        # pc.popover_footer(pc.text("Footer text.")),
+                        pc.popover_close_button(),
+                    ),
+                ),
+            ),
             flame_graph(
                 width=1024,
                 height=100,
@@ -264,7 +317,8 @@ app = pc.App(
         'react-json-view-lite.css',
     ],
 )
-app.add_page(index, on_load=State.load_flame_graph)
+app.add_page(index)
+# app.api.add_api_route("/update_trace/", update_trace)
 app.compile()
 
 if __name__ == "__main__":
