@@ -198,7 +198,7 @@ class SolarizedColors(str, Enum):
 
 
 class ColorStyle:
-    HUMAN = (SolarizedColors.base1, SolarizedColors.base03)
+    HUMAN = (SolarizedColors.base3, SolarizedColors.base03)
     SYSTEM = (SolarizedColors.base2, SolarizedColors.base03)
     BOTS = [
         SolarizedColors.yellow,
@@ -440,26 +440,22 @@ class MessageExploration(pc.Base):
             #    message threads that are not in the new message thread beam:
             #    2. message threads that come before the current message thread
             #    3. message threads that come after the current message thread
-            current_message_thread_idx = next(
-                i for i, mt in enumerate(message_thread_beam) if mt.uid == current_message_thread.uid
-            )
-            message_thread_beam_before = [
-                mt for mt in message_thread_beam[:current_message_thread_idx] if mt not in new_message_thread_beam
-            ]
-            message_thread_beam_before = self._deduplicate_message_threads(message_thread_beam_before[::-1], row)[::-1]
 
-            message_thread_beam_after = [
-                mt for mt in message_thread_beam[current_message_thread_idx + 1 :] if mt not in new_message_thread_beam
-            ]
-            message_thread_beam_after = self._deduplicate_message_threads(message_thread_beam_after, row)
+            message_threads = [mt for mt in message_thread_beam]
+            message_threads = self._deduplicate_message_threads(message_threads, row)
+
+            # obtain the index of the current message thread in the new message thread beam
+            current_message_idx = next(
+                i for i, mt in enumerate(message_threads) if mt.messages[row].uid == current_message.uid
+            )
 
             linked_messages_before: list[LinkedMessage] = [
                 LinkedMessage(thread_uid=message_thread.uid, uid=message_thread.messages[row].uid)
-                for message_thread in message_thread_beam_before
+                for message_thread in message_threads[:current_message_idx]
             ]
             linked_messages_after: list[LinkedMessage] = [
                 LinkedMessage(thread_uid=message_thread.uid, uid=message_thread.messages[row].uid)
-                for message_thread in message_thread_beam_after
+                for message_thread in message_threads[current_message_idx + 1 :]
             ]
             styled_message = StyledMessage.create(current_message, linked_messages_before, linked_messages_after)
             styled_messages.append(styled_message)
