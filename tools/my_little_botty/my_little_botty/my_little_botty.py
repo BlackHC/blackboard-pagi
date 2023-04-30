@@ -232,7 +232,7 @@ class Message(pc.Base):
     content: str | None
     error: str | None
 
-    def compute_editable_style(self):
+    def compute_editable_style(self) -> 'StyledMessage':
         return StyledMessage.create(self, [], [])
 
 
@@ -253,7 +253,7 @@ class StyledMessage(Message):
     @classmethod
     def create(
         cls, message: Message, prev_linked_messages: list[LinkedMessage], next_lined_messages: list[LinkedMessage]
-    ) -> str:
+    ) -> 'StyledMessage':
         fmt_creation_datetime = cls.format_datetime(message.creation_time)
 
         if message.role == MessageRole.SYSTEM:
@@ -333,6 +333,13 @@ class MessageThread(pc.Base):
     tags: list[str] = pydantic.Field(default_factory=list)
     messages: list[Message] = pydantic.Field(default_factory=list)
 
+    def get_message_by_uid(self, uid: str) -> Message | None:
+        filtered_message = [message for message in self.messages if message.uid == uid]
+        if not filtered_message:
+            return None
+        assert len(filtered_message) == 1
+        return filtered_message[0]
+
 
 class StyledMessageThread(MessageThread):
     messages: list[StyledMessage]
@@ -400,6 +407,19 @@ class MessageExploration(pc.Base):
         else:
             self.hidden_message_thread_uids.add(message_thread_uid)
 
+    def _deduplicate_message_threads(self, message_threads, row):
+        cleaned_message_threads = []
+        message_uids = set()
+        for message_thread in message_threads:
+            if len(message_thread.messages) <= row:
+                continue
+            message_uid = message_thread.messages[row].uid
+            if message_uid in message_uids:
+                continue
+            message_uids.add(message_uid)
+            cleaned_message_threads.append(message_thread)
+        return cleaned_message_threads
+
     def get_styled_current_message_thread(self) -> StyledMessageThread:
         """
         For the current message thread, we compute a StyledMessageThread.
@@ -426,9 +446,12 @@ class MessageExploration(pc.Base):
             message_thread_beam_before = [
                 mt for mt in message_thread_beam[:current_message_thread_idx] if mt not in new_message_thread_beam
             ]
+            message_thread_beam_before = self._deduplicate_message_threads(message_thread_beam_before[::-1], row)[::-1]
+
             message_thread_beam_after = [
                 mt for mt in message_thread_beam[current_message_thread_idx + 1 :] if mt not in new_message_thread_beam
             ]
+            message_thread_beam_after = self._deduplicate_message_threads(message_thread_beam_after, row)
 
             linked_messages_before: list[LinkedMessage] = [
                 LinkedMessage(thread_uid=message_thread.uid, uid=message_thread.messages[row].uid)
@@ -709,15 +732,15 @@ def render_message_menu(message: StyledMessage):
             pc.popover_arrow(),
             pc.popover_body(
                 pc.hstack(
-                    pc.button(pc.icon(tag="add"), size='xs', variant='ghost'),
-                    pc.button(pc.icon(tag="delete"), size='xs', variant='ghost'),
-                    pc.divider(orientation="vertical", height="1em"),
+                    # pc.button(pc.icon(tag="add"), size='xs', variant='ghost'),
+                    # pc.button(pc.icon(tag="delete"), size='xs', variant='ghost'),
+                    # pc.divider(orientation="vertical", height="1em"),
                     render_edit_thread_button(message),
                     render_fork_thread_button(message),  # type: ignore
                 )
             ),
             pc.popover_close_button(),
-            width='12em',
+            width='7em',  # '12em',
         ),
         trigger="hover",
     )
@@ -1070,6 +1093,7 @@ class EditableMessageState(State):
 
 
 def index() -> pc.Component:
+
     return pc.container(
         pc.vstack(
             render_message_thread(State.styled_message_thread),
