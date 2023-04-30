@@ -33,7 +33,7 @@ class TypedVar(Var):
             )
         return None
 
-    def __getattribute__(self, name: str) -> Var:
+    def __getattribute__(self, name: str) -> pc.Var:
         """Get a var attribute.
 
         Args:
@@ -345,6 +345,20 @@ class StyledMessageThread(MessageThread):
     messages: list[StyledMessage]
 
 
+class MessageGrid(pc.Base):
+    thread_uids: list[str]
+    message_grid: list[list[Message | None]]
+
+
+class StyledGridCell(pc.Base):
+    message: StyledMessage | None = None
+    row_idx: int
+    col_idx: int
+    thread_uid: str
+    col_span: int = 1
+    skip: bool = False
+
+
 class MessageExploration(pc.Base):
     uid: str
     current_message_thread_uid: str
@@ -419,6 +433,26 @@ class MessageExploration(pc.Base):
             message_uids.add(message_uid)
             cleaned_message_threads.append(message_thread)
         return cleaned_message_threads
+
+    def get_message_grid(self) -> MessageGrid:
+        # for each message thread create a tuple of all message uids in the thread
+        message_threads_map = {
+            tuple(message.uid for message in message_thread.messages): message_thread
+            for message_thread in self.message_threads
+        }
+        # sort lexigraphically by message uid tuples
+        sorted_message_threads_items = sorted(list(message_threads_map.items()), key=lambda kv: kv[0])
+
+        # create grid
+        row_count = max(len(message_thread.messages) for message_thread in self.message_threads)
+        message_grid = [[None for _ in message_threads_map] for _ in range(row_count)]
+        message_thread_uids = []
+        for col, (_, message_thread) in enumerate(sorted_message_threads_items):
+            message_thread_uids.append(message_thread.uid)
+            for row, message in enumerate(message_thread.messages):
+                message_grid[row][col] = message  # type: ignore
+
+        return MessageGrid(thread_uids=message_thread_uids, message_grid=message_grid)
 
     def get_styled_current_message_thread(self) -> StyledMessageThread:
         """
@@ -568,7 +602,7 @@ def render_message_toolbar(message: StyledMessage):
     )
 
 
-def render_caroussel_message(message: StyledMessage):
+def render_carousel_message(message: StyledMessage):
     return pc.grid_item(
         pc.button(
             pc.vstack(
@@ -647,16 +681,140 @@ def render_markdown(content: str | None):
     )
 
 
-def render_message_overview_caroussel():
+def render_message_overview_carousel():
     return pc.flex(
         pc.box(
             pc.grid(
-                pc.foreach(MessageOverviewState.styled_previous_messages, render_caroussel_message),
-                render_caroussel_message(MessageOverviewState.styled_current_message),
-                pc.foreach(MessageOverviewState.styled_next_messages, render_caroussel_message),
+                pc.foreach(MessageOverviewState.styled_previous_messages, render_carousel_message),
+                render_carousel_message(MessageOverviewState.styled_current_message),
+                pc.foreach(MessageOverviewState.styled_next_messages, render_carousel_message),
                 gap="1ch",
                 width="fit-content",
-                font_size="0.5em",
+                zoom="0.75",
+            ),
+            max_width="100%",
+            overflow="scroll",
+        ),
+        justify_content="center",
+        width="100vw",
+        max_width="100vw",
+        margin_left="50%",
+        transform="translateX(-50%)",
+        padding_bottom="0.5em",
+    )
+
+
+@typing.no_type_check
+def render_grid_cell(styled_grid_cell: StyledGridCell):
+    message = styled_grid_cell.message
+
+    return pc.cond(
+        ~styled_grid_cell.skip,
+        pc.grid_item(
+            pc.cond(
+                message,
+                pc.vstack(
+                    pc.box(
+                        pc.flex(
+                            pc.text(message.fmt_header),
+                            pc.spacer(),
+                            pc.text(message.fmt_creation_datetime),
+                            width="100%",
+                        ),
+                        background_color=message.background_color,
+                        color=message.foreground_color,
+                        border_radius="15px 15px 0 0",
+                        width="100%",
+                        padding="0.25em 0.25em 0 0.5em",
+                        margin_bottom="0",
+                    ),
+                    pc.cond(
+                        message.error,
+                        pc.fragment(
+                            pc.cond(
+                                message.content,
+                                pc.box(
+                                    render_markdown(message.content),
+                                    border_radius="0 0 0 0",
+                                    color=message.foreground_color,
+                                    border_width="medium",
+                                    border_color=message.foreground_color,
+                                    width="100%",
+                                    padding="0 0.25em 0 0.25em",
+                                ),
+                            ),
+                            pc.box(
+                                pc.markdown(message.error),
+                                border_radius="0 0 15px 15px",
+                                color=message.foreground_color,
+                                background_color=SolarizedColors.red,
+                                width="100%",
+                                padding="0 0.25em 0 0.25em",
+                            ),
+                        ),
+                        pc.cond(
+                            message.content,
+                            pc.box(
+                                render_markdown(message.content),
+                                border_radius="0 0 15px 15px",
+                                color=message.foreground_color,
+                                border_width="medium",
+                                border_color=message.foreground_color,
+                                width="100%",
+                                padding="0 0.25em 0 0.25em",
+                            ),
+                        ),
+                    ),
+                    width="30ch",
+                    max_width="30ch",
+                    padding="0.5em",
+                    spacing="0em",
+                ),
+            ),
+            row_start=styled_grid_cell.row_idx,
+            col_start=styled_grid_cell.col_idx,
+            col_span=styled_grid_cell.col_span,
+            justify_self="center",
+            style={
+                "border-width": "0 thin 0 thin",
+                "border_color": SolarizedColors.base1,
+                "width": "100%",
+                "justify-content": "center",
+                "display": "flex",
+            },
+        ),
+    )
+
+
+def render_grid_row(message_row: list[StyledGridCell]):
+    return pc.foreach(message_row, render_grid_cell)
+
+
+def render_grid_column_button(thread_uid: str, index):
+    return pc.grid_item(
+        pc.button(
+            width="100%",
+            height="100%",
+            on_click=lambda: MessageGridState.go_to_thread(thread_uid),  # type: ignore
+            variant="ghost",
+            opacity=0.5,
+            min_width="30ch",
+        ),
+        row_start=1,
+        row_span=MessageGridState.styled_grid_cells.length(),
+        col_start=index.to(int) + 1,
+        col_span=1,
+    )
+
+
+def render_message_grid():
+    return pc.flex(
+        pc.box(
+            pc.grid(
+                pc.foreach(MessageGridState.styled_grid_cells, render_grid_row),
+                pc.foreach(MessageGridState.column_thread_uids, render_grid_column_button),
+                width="fit-content",
+                zoom="0.75",
             ),
             max_width="100%",
             overflow="scroll",
@@ -851,7 +1009,7 @@ def render_message(message: StyledMessage):
         render_editable_message(EditableMessageState.styled_editable_message),
         pc.cond(
             message.uid == MessageOverviewState.current_message_uid,
-            render_message_overview_caroussel(),
+            render_message_overview_carousel(),
             render_static_message(message),
         ),
     )
@@ -872,7 +1030,9 @@ def render_message_thread_menu(message_thread: MessageThread):
                     pc.button(pc.icon(tag="lock"), size='xs', variant='ghost'),
                     pc.button(pc.icon(tag="edit"), size='xs', variant='ghost'),
                     pc.divider(orientation="vertical", height="1em"),
-                    pc.button(pc.icon(tag="drag_handle"), size='xs', variant='ghost'),
+                    pc.button(
+                        pc.icon(tag="drag_handle"), size='xs', variant='ghost', on_click=MessageGridState.toggle_grid
+                    ),
                 )
             ),
             pc.popover_close_button(),
@@ -882,7 +1042,7 @@ def render_message_thread_menu(message_thread: MessageThread):
     )
 
 
-def render_message_thread(message_thread: MessageThread):
+def render_message_exploration(message_thread: MessageThread):
     return pc.box(
         pc.hstack(
             render_message_thread_menu(message_thread),
@@ -891,8 +1051,12 @@ def render_message_thread(message_thread: MessageThread):
         pc.divider(margin="0.5em"),
         pc.markdown(message_thread.note),
         pc.divider(margin="0.5em"),
-        pc.box(
-            pc.foreach(message_thread.messages, render_message),
+        pc.cond(
+            MessageGridState.is_grid_visible,
+            render_message_grid(),
+            pc.box(
+                pc.foreach(message_thread.messages, render_message),
+            ),
         ),
         width="100%",
     )
@@ -1250,10 +1414,72 @@ class MessageOverviewState(State):
         ]
 
 
+class MessageGridState(State):
+    _grid: MessageGrid | None = None
+
+    def toggle_grid(self):
+        if self._grid is None:
+            self._grid = self._message_exploration.get_message_grid()
+        else:
+            self._grid = None
+        self.mark_dirty()
+
+    def go_to_thread(self, thread_uid: str):
+        self._message_exploration.current_message_thread_uid = thread_uid
+        self._grid = None
+        self.mark_dirty()
+
+    @pc.var
+    def is_grid_visible(self) -> bool:
+        return self._grid is not None
+
+    @pc.var
+    def column_thread_uids(self) -> list[str]:
+        if self._grid is None:
+            return []
+        return self._grid.thread_uids
+
+    @pc.var
+    def styled_grid_cells(self) -> list[list[StyledGridCell]]:
+        if self._grid is None:
+            return [[]]
+
+        styled_grid_cells = []
+        for row_idx, messages in enumerate(self._grid.message_grid):
+            styled_row = []
+            for col_idx, message in enumerate(messages):
+                styled_grid_cell = StyledGridCell(
+                    message=message.compute_editable_style() if message is not None else None,
+                    row_idx=row_idx + 1,
+                    col_idx=col_idx + 1,
+                    thread_uid=self._grid.thread_uids[col_idx],
+                )
+                styled_row.append(styled_grid_cell)
+            styled_grid_cells.append(styled_row)
+
+        # compress the grid row-by-row using col_span for duplicated cells
+        for row_idx, row in enumerate(styled_grid_cells):
+            col_idx = 0
+            while col_idx < len(row):
+                cell = row[col_idx]
+                if cell.message is None:
+                    col_idx += 1
+                    continue
+                col_span = 1
+                while col_idx + col_span < len(row) and row[col_idx + col_span].message == cell.message:
+                    col_span += 1
+                if col_span > 1:
+                    row[col_idx].col_span = col_span
+                    for i in range(col_idx + 1, col_idx + col_span):
+                        row[i].skip = True
+                col_idx += col_span
+        return styled_grid_cells
+
+
 def index() -> pc.Component:
     return pc.container(
         pc.vstack(
-            render_message_thread(State.styled_message_thread),
+            render_message_exploration(State.styled_message_thread),
             width="100",
         ),
         padding_top="64px",
