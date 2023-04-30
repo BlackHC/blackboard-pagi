@@ -1,17 +1,153 @@
 """Welcome to Pynecone! This file outlines the steps to create a basic app."""
 import pprint  # noqa: F401
+import time
+import types
 import typing
 from datetime import datetime
 from enum import Enum
 
+import pydantic
 import pynecone as pc
 import pynecone.pc as cli
+from pydantic.fields import ModelField
 from pynecone import Var
-from pynecone.var import ComputedVar
+from pynecone.var import BaseVar, ComputedVar
+
+
+class TypedVar(Var):
+    def __try_type_get(self, name, outer_type_: type):
+        # check if type_ is a Union
+        if isinstance(outer_type_, types.UnionType):
+            for sub_type_ in outer_type_.__args__:
+                var = self.__try_type_get(name, sub_type_)
+                if var is not None:
+                    return var
+        if hasattr(outer_type_, "__fields__") and name in outer_type_.__fields__:
+            type_ = outer_type_.__fields__[name].outer_type_
+            if isinstance(type_, ModelField):
+                type_ = type_.type_
+            return BaseVar(
+                name=f"{self.name}.{name}",
+                type_=type_,
+                state=self.state,
+            )
+        return None
+
+    def __getattribute__(self, name: str) -> Var:
+        """Get a var attribute.
+
+        Args:
+            name: The name of the attribute.
+
+        Returns:
+            The var attribute.
+
+        Raises:
+            Exception: If the attribute is not found.
+        """
+        try:
+            return super().__getattribute__(name)
+        except Exception as e:
+            # Check if the attribute is one of the class fields.
+            if not name.startswith("_"):
+                var = self.__try_type_get(name, self.type_)
+                if var is not None:
+                    return var
+
+            raise e
+
+
+Var.register(TypedVar)
+
+
+class TypedBaseVar(TypedVar, pc.Base):
+    """A base (non-computed) var of the app state."""
+
+    # The name of the var.
+    name: str
+
+    # The type of the var.
+    type_: typing.Any
+
+    # The name of the enclosing state.
+    state: str = ""
+
+    # Whether this is a local javascript variable.
+    is_local: bool = False
+
+    # Whether this var is a raw string.
+    is_string: bool = False
+
+    def __hash__(self) -> int:
+        """Define a hash function for a var.
+
+        Returns:
+            The hash of the var.
+        """
+        return hash((self.name, str(self.type_)))
+
+    @typing.no_type_check
+    def get_default_value(self) -> typing.Any:
+        """Get the default value of the var.
+
+        Returns:
+            The default value of the var.
+        """
+        type_ = self.type_.__origin__ if types.is_generic_alias(self.type_) else self.type_
+        if issubclass(type_, str):
+            return ""
+        if issubclass(type_, types.get_args(typing.Union[int, float])):
+            return 0
+        if issubclass(type_, bool):
+            return False
+        if issubclass(type_, list):
+            return []
+        if issubclass(type_, dict):
+            return {}
+        if issubclass(type_, tuple):
+            return ()
+        return set() if issubclass(type_, set) else None
+
+    def get_setter_name(self, include_state: bool = True) -> str:
+        """Get the name of the var's generated setter function.
+
+        Args:
+            include_state: Whether to include the state name in the setter name.
+
+        Returns:
+            The name of the setter function.
+        """
+        setter = pc.constants.SETTER_PREFIX + self.name
+        if not include_state or self.state == "":
+            return setter
+        return ".".join((self.state, setter))
+
+    def get_setter(self) -> typing.Callable[[pc.State, typing.Any], None]:
+        """Get the var's setter function.
+
+        Returns:
+            A function that that creates a setter for the var.
+        """
+
+        def setter(state: State, value: typing.Any):
+            """Get the setter for the var.
+
+            Args:
+                state: The state within which we add the setter function.
+                value: The value to set.
+            """
+            setattr(state, self.name, value)
+
+        setter.__qualname__ = self.get_setter_name()
+
+        return setter
+
+
+BaseVar.register(TypedBaseVar)
 
 
 # Redefine ComputedVar to revert the baseclasses
-class _ComputedVar(Var, property):
+class TypedComputedVar(TypedVar, property):
     """A field with computed getters."""
 
     @property
@@ -36,8 +172,7 @@ class _ComputedVar(Var, property):
         return typing.Any
 
 
-pc.var = _ComputedVar
-
+pc.var = TypedComputedVar
 ComputedVar.register(pc.var)
 
 
@@ -97,8 +232,13 @@ class Message(pc.Base):
     content: str | None
     error: str | None
 
-    def compute_style(self):
-        return StyledMessage.create(self)
+    def compute_editable_style(self):
+        return StyledMessage.create(self, [], [])
+
+
+class LinkedMessage(pc.Base):
+    thread_uid: str
+    uid: str
 
 
 class StyledMessage(Message):
@@ -107,9 +247,13 @@ class StyledMessage(Message):
     align: str
     fmt_creation_datetime: str
     fmt_header: str
+    prev_linked_messages: list[LinkedMessage]
+    next_linked_messages: list[LinkedMessage]
 
     @classmethod
-    def create(cls, message: Message) -> str:
+    def create(
+        cls, message: Message, prev_linked_messages: list[LinkedMessage], next_lined_messages: list[LinkedMessage]
+    ) -> str:
         fmt_creation_datetime = cls.format_datetime(message.creation_time)
 
         if message.role == MessageRole.SYSTEM:
@@ -134,6 +278,8 @@ class StyledMessage(Message):
             foreground_color=foreground_color,
             fmt_creation_datetime=fmt_creation_datetime,
             fmt_header=fmt_header,
+            prev_linked_messages=prev_linked_messages,
+            next_linked_messages=next_lined_messages,
             **dict(message),
         )
 
@@ -182,36 +328,171 @@ class StyledMessage(Message):
 
 class MessageThread(pc.Base):
     uid: str
-    title: str
-    note: str
-    tags: list[str]
-    messages: list[Message]
-    forked_threads: list['MessageThread']
-
-    def compute_style(self) -> 'StyledMessageThread':
-        return StyledMessageThread(
-            uid=self.uid,
-            title=self.title,
-            note=self.note,
-            tags=self.tags,
-            messages=[StyledMessage.create(message) for message in self.messages],
-            forked_threads=[thread.compute_style() for thread in self.forked_threads],
-        )
+    title: str = "Untitled"
+    note: str = ""
+    tags: list[str] = pydantic.Field(default_factory=list)
+    messages: list[Message] = pydantic.Field(default_factory=list)
 
 
 class StyledMessageThread(MessageThread):
     messages: list[StyledMessage]
 
 
-def render_message_content(message_content: str | None):
-    return pc.cond(message_content, pc.markdown(message_content))  # type: ignore
+class MessageExploration(pc.Base):
+    uid: str
+    current_message_thread_uid: str
+    message_threads: list[MessageThread]
+    hidden_message_thread_uids: set[str] = pydantic.Field(default_factory=set)
+
+    _message_uid_map: dict[str, Message] = pydantic.PrivateAttr(default_factory=dict)
+
+    @property
+    def message_uid_map(self) -> dict[str, Message]:
+        return self._message_uid_map
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._message_uid_map = self._compute_message_uid_map()
+
+    @property
+    def current_message_thread(self) -> MessageThread:
+        return self.get_message_thread_by_uid(self.current_message_thread_uid)
+
+    def get_message_thread_by_uid(self, uid: str):
+        matches = [mt for mt in self.message_threads if mt.uid == uid]
+        assert len(matches) == 1
+        return matches[0]
+
+    def update_message_thread(self, message_thread: MessageThread):
+        # insert the message thread after the current one
+        idx = self.message_threads.index(self.current_message_thread)
+        self.message_threads.insert(idx + 1, message_thread)
+        self.current_message_thread_uid = message_thread.uid
+
+        # update the message uid map
+        self._message_uid_map = self._compute_message_uid_map()
+
+    def delete_message_thread(self, message_thread_uid: str):
+        """
+        Remove the message thread with the given uid from the list of message threads.
+        Update the current message thread to the previous one if possible.
+        Remove the message thread from the list of hidden message threads if it was hidden.
+        """
+        idx = next(i for i, mt in enumerate(self.message_threads) if mt.uid == message_thread_uid)
+        self.message_threads.pop(idx)
+
+        if idx > 0:
+            self.current_message_thread_uid = self.message_threads[idx - 1].uid
+        elif len(self.message_threads) > 0:
+            self.current_message_thread_uid = self.message_threads[0].uid
+        else:
+            self.message_threads = [MessageThread(uid=UID.create())]
+            self.current_message_thread_uid = self.message_threads[0].uid
+
+        self.hidden_message_thread_uids.discard(message_thread_uid)
+
+        # update the message uid map
+        self._message_uid_map = self._compute_message_uid_map()
+
+    def set_message_thread_visible(self, message_thread_uid: str, visible: bool):
+        if visible:
+            self.hidden_message_thread_uids.discard(message_thread_uid)
+        else:
+            self.hidden_message_thread_uids.add(message_thread_uid)
+
+    def get_styled_current_message_thread(self) -> StyledMessageThread:
+        """
+        For the current message thread, we compute a StyledMessageThread.
+        """
+        current_message_thread = self.current_message_thread
+
+        message_thread_beam = self.message_threads
+
+        styled_messages = []
+        for row, current_message in enumerate(current_message_thread.messages):
+            # find all message threads in the beam that have a message with the same uid in the same row (if available)
+            new_message_thread_beam = []
+            for message_thread in message_thread_beam:
+                if len(message_thread.messages) > row and message_thread.messages[row].uid == current_message.uid:
+                    new_message_thread_beam.append(message_thread)
+            # split message thread beam into three parts:
+            # 1. message threads thare are also in the new message thread beam, and
+            #    message threads that are not in the new message thread beam:
+            #    2. message threads that come before the current message thread
+            #    3. message threads that come after the current message thread
+            current_message_thread_idx = next(
+                i for i, mt in enumerate(message_thread_beam) if mt.uid == current_message_thread.uid
+            )
+            message_thread_beam_before = [
+                mt for mt in message_thread_beam[:current_message_thread_idx] if mt not in new_message_thread_beam
+            ]
+            message_thread_beam_after = [
+                mt for mt in message_thread_beam[current_message_thread_idx + 1 :] if mt not in new_message_thread_beam
+            ]
+
+            linked_messages_before: list[LinkedMessage] = [
+                LinkedMessage(thread_uid=message_thread.uid, uid=message_thread.messages[row].uid)
+                for message_thread in message_thread_beam_before
+            ]
+            linked_messages_after: list[LinkedMessage] = [
+                LinkedMessage(thread_uid=message_thread.uid, uid=message_thread.messages[row].uid)
+                for message_thread in message_thread_beam_after
+            ]
+            styled_message = StyledMessage.create(current_message, linked_messages_before, linked_messages_after)
+            styled_messages.append(styled_message)
+
+            message_thread_beam = new_message_thread_beam
+
+        # pprint.pprint(styled_messages)
+
+        return StyledMessageThread(
+            uid=current_message_thread.uid,
+            title=current_message_thread.title,
+            note=current_message_thread.note,
+            tags=current_message_thread.tags,
+            messages=styled_messages,
+        )
+
+    def _compute_message_uid_map(self):
+        message_uid_map = {}
+        for message_thread in self.message_threads:
+            for message in message_thread.messages:
+                stored_message = message_uid_map.setdefault(message.uid, message)
+                assert stored_message == message
+        return message_uid_map
 
 
+def render_static_message_content(message: StyledMessage):
+    is_not_bot = message.role != "Bot"
+    return pc.cond(is_not_bot, pc.markdown(message.content), pc.cond(message.content, pc.markdown(message.content)))
+
+
+def render_edit_thread_button(message: StyledMessage):
+    return pc.button(
+        pc.icon(tag="edit"),
+        size='xs',
+        variant='ghost',
+        on_click=lambda: EditableMessageState.enter_editing(message.uid),  # type: ignore
+    )
+
+
+def render_fork_thread_button(message: StyledMessage):
+    return pc.button(
+        pc.icon(tag="repeat_clock"),
+        size='xs',
+        variant='ghost',
+        on_click=lambda: EditableMessageState.enter_forking(message.uid),  # type: ignore
+    )
+
+
+@typing.no_type_check
 def render_message_toolbar(message: StyledMessage):
-    is_editing = message.uid == EditableMessageState.editable_message_uid
+    num_threads = 1 + message.next_linked_messages.length() + message.prev_linked_messages.length()
+    thread_index = 1 + message.prev_linked_messages.length()
+    is_not_bot = message.role != "Bot"
     return pc.fragment(
         pc.cond(
-            is_editing,
+            message.uid == EditableMessageState.editable_message_uid,
             pc.hstack(
                 pc.button(
                     pc.icon(tag="check"), size='xs', variant='ghost', on_click=EditableMessageState.submit_editing
@@ -222,11 +503,48 @@ def render_message_toolbar(message: StyledMessage):
                 ),
                 pc.divider(orientation="vertical", height="1em"),
             ),
-            render_message_menu(message),
+            pc.fragment(
+                render_message_menu(message),
+                pc.cond(is_not_bot, render_fork_thread_button(message), render_edit_thread_button(message)),
+            ),
         ),
-        pc.button(pc.icon(tag="chevron_left"), size='xs', variant='ghost', is_disabled=is_editing),
-        pc.button(pc.icon(tag="search"), size='xs', variant='ghost', is_disabled=is_editing),
-        pc.button(pc.icon(tag="chevron_right"), size='xs', variant='ghost', is_disabled=is_editing),
+        pc.fragment(
+            pc.button(
+                pc.icon(tag="chevron_left"),
+                size='xs',
+                variant='ghost',
+                is_disabled=EditableMessageState.is_editing | (message.prev_linked_messages.length() == 0),
+                on_click=lambda: NavigationState.go_to(
+                    message.prev_linked_messages[-1].thread_uid,
+                    message.prev_linked_messages[-1].uid,
+                ),
+            ),
+            pc.button(
+                pc.icon(tag="search"),
+                size='xs',
+                variant='ghost',
+                is_disabled=EditableMessageState.is_editing
+                | ((message.next_linked_messages.length() + message.prev_linked_messages.length()) == 0),
+            ),
+            pc.button(
+                pc.icon(tag="chevron_right"),
+                size='xs',
+                variant='ghost',
+                is_disabled=EditableMessageState.is_editing | (message.next_linked_messages.length() == 0),
+                on_click=lambda: NavigationState.go_to(
+                    message.next_linked_messages[0].thread_uid,
+                    message.next_linked_messages[0].uid,
+                ),
+            ),
+        ),
+        pc.cond(
+            num_threads > 1,
+            pc.fragment(
+                pc.text(thread_index),
+                pc.text("/", color=SolarizedColors.base0),
+                pc.text(num_threads, color=SolarizedColors.base0),
+            ),
+        ),
     )
 
 
@@ -255,7 +573,7 @@ def render_static_message(message: StyledMessage):
                     pc.cond(
                         message.content,
                         pc.box(
-                            render_message_content(message.content),
+                            render_static_message_content(message),
                             border_radius="0 0 0 0",
                             color=message.foreground_color,
                             border_width="medium",
@@ -276,7 +594,7 @@ def render_static_message(message: StyledMessage):
                 pc.cond(
                     message.content,
                     pc.box(
-                        render_message_content(message.content),
+                        render_static_message_content(message),
                         border_radius="0 0 15px 0",
                         color=message.foreground_color,
                         border_width="medium",
@@ -362,8 +680,16 @@ def render_editable_message_error(message):
     )
 
 
+class AutoFocusTextArea(pc.TextArea):
+    auto_focus: Var[typing.Union[str, int, bool]]
+
+
+auto_focus_text_area = AutoFocusTextArea.create
+
+
 def render_editable_message_content(message, with_error: bool):
-    return pc.text_area(
+    return auto_focus_text_area(
+        auto_focus=True,
         default_value=message.content,
         border_radius="0 0 0 0" if with_error else "0 0 15px 0",
         color=message.foreground_color,
@@ -376,7 +702,9 @@ def render_editable_message_content(message, with_error: bool):
 
 def render_message_menu(message: StyledMessage):
     return pc.popover(
-        pc.popover_trigger(pc.button(pc.icon(tag="hamburger"), size='xs', variant='ghost')),
+        pc.popover_trigger(
+            pc.button(pc.icon(tag="hamburger"), size='xs', variant='ghost', is_disabled=EditableMessageState.is_editing)
+        ),
         pc.popover_content(
             pc.popover_arrow(),
             pc.popover_body(
@@ -384,13 +712,8 @@ def render_message_menu(message: StyledMessage):
                     pc.button(pc.icon(tag="add"), size='xs', variant='ghost'),
                     pc.button(pc.icon(tag="delete"), size='xs', variant='ghost'),
                     pc.divider(orientation="vertical", height="1em"),
-                    pc.button(
-                        pc.icon(tag="edit"),
-                        size='xs',
-                        variant='ghost',
-                        on_click=lambda: EditableMessageState.set_editing(message.uid),  # type: ignore
-                    ),
-                    pc.button(pc.icon(tag="repeat_clock"), size='xs', variant='ghost'),
+                    render_edit_thread_button(message),
+                    render_fork_thread_button(message),  # type: ignore
                 )
             ),
             pc.popover_close_button(),
@@ -477,7 +800,7 @@ example_message_thread = MessageThread(
             role=MessageRole.SYSTEM,
             creation_time=0,
             source=MessageSource(),
-            content="Be whatever you want to be.",
+            content="# Be whatever you want to be.",
         ),
         Message(
             uid=UID.create(),
@@ -597,27 +920,39 @@ example_message_thread = MessageThread(
     forked_threads=[],
 )
 
+example_message_exploration = MessageExploration(
+    uid=UID.create(),
+    current_message_thread_uid=example_message_thread.uid,
+    message_threads=[example_message_thread],
+    hidden_message_thread_uids=set(),
+)
+
 
 class State(pc.State):
     """The app state."""
 
-    _message_thread: MessageThread = example_message_thread
-    _message_map: dict[str, Message] = {}
+    _message_exploration: MessageExploration = example_message_exploration
+    auto_focus_uid: str | None = None
 
     @property
     def message_map(self):
-        self._message_map = {
-            m.uid: m for thread in [self._message_thread] + self._message_thread.forked_threads for m in thread.messages
-        }
-        return self._message_map
+        return self._message_exploration.message_uid_map
 
     @pc.var
     def styled_message_thread(self) -> StyledMessageThread:
-        return self._message_thread.compute_style()
+        return self._message_exploration.get_styled_current_message_thread()
+
+
+class NavigationState(State):
+    def go_to(self, thread_id, message_uid):
+        self.auto_focus_uid = message_uid
+        self._message_exploration.current_message_thread_uid = thread_id
+        self.mark_dirty()
 
 
 class EditableMessageState(State):
     _editable_message: Message | None = None
+    fork_mode: bool = False
 
     @pc.var
     def editable_message_uid(self) -> str | None:
@@ -626,26 +961,48 @@ class EditableMessageState(State):
         else:
             return self._editable_message.uid
 
+    @pc.var
+    def is_editing(self) -> bool:
+        return self._editable_message is not None
+
     @typing.no_type_check
     @pc.var
-    def styled_editable_message(self) -> StyledMessage:
+    def styled_editable_message(self) -> StyledMessage | None:
         if self._editable_message is None:
             return None
         else:
-            return self._editable_message.compute_style()
+            return self._editable_message.compute_editable_style()
 
     def cancel_editing(self):
         self._editable_message = None
+        self.mark_dirty()
 
     def submit_editing(self):
-        self._editable_message = None
+        if self._editable_message is None:
+            return
 
-    def set_editing(self, uid: str):
+        if self.fork_mode:
+            EditableMessageState._fork_thread(self)
+        else:
+            EditableMessageState._edit_thread(self)
+
+        self._editable_message = None
+        self.mark_dirty()
+
+    def enter_editing(self, uid: str):
         self._editable_message = self.message_map[uid].copy()
+        self.fork_mode = False
+        self.mark_dirty()
+
+    def enter_forking(self, uid: str):
+        self._editable_message = self.message_map[uid].copy()
+        self.fork_mode = True
+        self.mark_dirty()
 
     def set_editable_message_content(self, content: str):
         assert self._editable_message is not None
         self._editable_message.content = content
+        print("new content", content)
 
     def set_editable_message_role(self, role: str):
         assert self._editable_message is not None
@@ -655,6 +1012,61 @@ class EditableMessageState(State):
         assert self._editable_message is not None
         self._editable_message.error = None
         self.mark_dirty()
+
+    def _edit_thread(self):
+        original_message = self.message_map[self._editable_message.uid]
+
+        print(original_message, self._editable_message)
+        if self._editable_message == original_message:
+            return
+
+        # copy the current message thread
+        message_thread = self._message_exploration.current_message_thread.copy()
+        message_thread.uid = UID.create()
+
+        # update the message in the message thread
+        messages = list(message_thread.messages)
+
+        # create a message with a new uid
+        new_message = self._editable_message.copy()
+        new_message.uid = UID.create()
+        new_message.source = new_message.source.copy()
+        new_message.source.edited = True
+
+        messages[messages.index(original_message)] = new_message
+        message_thread.messages = messages
+
+        # update the message exploration
+        self._message_exploration.update_message_thread(message_thread)
+
+    def _fork_thread(self):
+        original_message = self.message_map[self._editable_message.uid]
+        if original_message == self._editable_message:
+            return
+
+        # copy the current message thread
+        message_thread = self._message_exploration.current_message_thread.copy()
+        message_thread.uid = UID.create()
+
+        # update the message in the message thread
+        message_index = message_thread.messages.index(original_message)
+        messages = list(message_thread.messages[: message_index + 1])
+
+        # create a message with a new uid
+        new_message = self._editable_message.copy()
+        new_message.uid = UID.create()
+        if new_message.source.model_type is not None:
+            new_message.source = new_message.source.copy()
+            new_message.source.edited = True
+        else:
+            new_message.creation_time = time.time()
+        new_message.error = None
+
+        messages[-1] = new_message
+        message_thread.messages = messages
+
+        # update the message exploration
+        self._message_exploration.update_message_thread(message_thread)
 
 
 def index() -> pc.Component:
