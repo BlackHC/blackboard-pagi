@@ -280,7 +280,7 @@ class StyledMessage(Message):
             fmt_header=fmt_header,
             prev_linked_messages=prev_linked_messages,
             next_linked_messages=next_lined_messages,
-            **dict(message),
+            **dict(Message(**dict(message))),
         )
 
     @staticmethod
@@ -548,6 +548,7 @@ def render_message_toolbar(message: StyledMessage):
                 variant='ghost',
                 is_disabled=EditableMessageState.is_editing
                 | ((message.next_linked_messages.length() + message.prev_linked_messages.length()) == 0),
+                on_click=MessageOverviewState.show_drawer(message.uid),
             ),
             pc.button(
                 pc.icon(tag="chevron_right"),
@@ -568,6 +569,108 @@ def render_message_toolbar(message: StyledMessage):
                 pc.text(num_threads, color=SolarizedColors.base0),
             ),
         ),
+    )
+
+
+def render_caroussel_message(message: StyledMessage):
+    return pc.grid_item(
+        pc.button(
+            pc.vstack(
+                pc.box(
+                    pc.flex(
+                        pc.text(message.fmt_header),
+                        pc.spacer(),
+                        pc.text(message.fmt_creation_datetime),
+                        width="100%",
+                    ),
+                    background_color=message.background_color,
+                    color=message.foreground_color,
+                    border_radius="15px 15px 0 0",
+                    width="100%",
+                    padding="0.25em 0.25em 0 0.5em",
+                    margin_bottom="0",
+                ),
+                pc.cond(
+                    message.error,
+                    pc.fragment(
+                        pc.cond(
+                            message.content,
+                            pc.box(
+                                render_markdown(message.content),
+                                border_radius="0 0 0 0",
+                                color=message.foreground_color,
+                                border_width="medium",
+                                border_color=message.foreground_color,
+                                width="100%",
+                                padding="0 0.25em 0 0.25em",
+                            ),
+                        ),
+                        pc.box(
+                            pc.markdown(message.error),
+                            border_radius="0 0 15px 15px",
+                            color=message.foreground_color,
+                            background_color=SolarizedColors.red,
+                            width="100%",
+                            padding="0 0.25em 0 0.25em",
+                        ),
+                    ),
+                    pc.cond(
+                        message.content,
+                        pc.box(
+                            render_markdown(message.content),
+                            border_radius="0 0 15px 15px",
+                            color=message.foreground_color,
+                            border_width="medium",
+                            border_color=message.foreground_color,
+                            width="100%",
+                            padding="0 0.25em 0 0.25em",
+                        ),
+                    ),
+                ),
+                width="30ch",
+                max_width="30ch",
+                padding_top="0.5em",
+                padding_bottom="0.5em",
+                spacing="0em",
+            ),
+            width="30ch",
+            max_width="32ch",
+            height="100%",
+            on_click=lambda: MessageOverviewState.close_drawer(message.uid),  # type: ignore
+            variant="solid",
+        ),
+        row_start=1,
+    )
+
+
+def render_markdown(content: str | None):
+    return pc.box(
+        pc.cond(content, pc.markdown(content)),
+        max_height="50vh",
+        style={"word-wrap": "break-word", "white-space": "pre-wrap", "text-align": "left", "overflow": "scroll"},
+    )
+
+
+def render_message_overview_caroussel():
+    return pc.flex(
+        pc.box(
+            pc.grid(
+                pc.foreach(MessageOverviewState.styled_previous_messages, render_caroussel_message),
+                render_caroussel_message(MessageOverviewState.styled_current_message),
+                pc.foreach(MessageOverviewState.styled_next_messages, render_caroussel_message),
+                gap="1ch",
+                width="fit-content",
+                font_size="0.5em",
+            ),
+            max_width="100%",
+            overflow="scroll",
+        ),
+        justify_content="center",
+        width="100vw",
+        max_width="100vw",
+        margin_left="50%",
+        transform="translateX(-50%)",
+        padding_bottom="0.5em",
     )
 
 
@@ -627,7 +730,7 @@ def render_static_message(message: StyledMessage):
                     ),
                 ),
             ),
-            width="75%",
+            width="60ch",
             padding_bottom="0.5em",
             spacing="0em",
         ),
@@ -750,7 +853,11 @@ def render_message(message: StyledMessage):
     return pc.cond(
         message.uid == EditableMessageState.editable_message_uid,
         render_editable_message(EditableMessageState.styled_editable_message),
-        render_static_message(message),
+        pc.cond(
+            message.uid == MessageOverviewState.current_message_uid,
+            render_message_overview_caroussel(),
+            render_static_message(message),
+        ),
     )
 
 
@@ -1092,8 +1199,62 @@ class EditableMessageState(State):
         self._message_exploration.update_message_thread(message_thread)
 
 
-def index() -> pc.Component:
+class MessageOverviewState(State):
+    current_message_uid: str | None = None
 
+    def show_drawer(self, message_uid: str):
+        self.current_message_uid = message_uid
+
+    def close_drawer(self, target_message_uid: str):
+        styled_current_message: StyledMessage | None = MessageOverviewState._get_current_message(self)
+        if styled_current_message is None:
+            return
+        # find target_message_uid in prev_linked_messages and next_linked_messages
+        linked_message = [
+            message
+            for message in styled_current_message.prev_linked_messages + styled_current_message.next_linked_messages
+            if message.uid == target_message_uid
+        ]
+        if len(linked_message) != 0:
+            linked_message = linked_message[0]
+            # set the current message thread to the thread of the linked message
+            self._message_exploration.current_message_thread_uid = linked_message.thread_uid
+
+        self.current_message_uid = None
+        self.mark_dirty()
+
+    def _get_current_message(self) -> StyledMessage | None:
+        return self.styled_message_thread.get_message_by_uid(self.current_message_uid)
+
+    @pc.var
+    def styled_current_message(self) -> StyledMessage | None:
+        styled_current_message: StyledMessage | None = MessageOverviewState._get_current_message(self)
+        if styled_current_message is None:
+            return None
+        return styled_current_message.compute_editable_style()
+
+    @pc.var
+    def styled_previous_messages(self) -> list[StyledMessage]:
+        styled_current_message: StyledMessage | None = MessageOverviewState._get_current_message(self)
+        if styled_current_message is None:
+            return []
+        return [
+            self.message_map[prev_linked_message.uid].compute_editable_style()
+            for prev_linked_message in styled_current_message.prev_linked_messages
+        ]
+
+    @pc.var
+    def styled_next_messages(self) -> list[StyledMessage]:
+        styled_current_message: StyledMessage | None = MessageOverviewState._get_current_message(self)
+        if styled_current_message is None:
+            return []
+        return [
+            self.message_map[next_linked_message.uid].compute_editable_style()
+            for next_linked_message in styled_current_message.next_linked_messages
+        ]
+
+
+def index() -> pc.Component:
     return pc.container(
         pc.vstack(
             render_message_thread(State.styled_message_thread),
