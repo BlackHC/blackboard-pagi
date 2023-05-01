@@ -1177,7 +1177,7 @@ def render_model_options():
                     pc.th("Model"),
                     pc.td(
                         pc.select(
-                            options=[
+                            [
                                 "GPT-3.5",
                                 "GPT-4",
                             ],
@@ -1195,13 +1195,14 @@ def render_model_options():
                     ),
                 ),
                 pc.tr(
-                    pc.th("Max Length"),
+                    pc.th("Max Tokens"),
                     pc.td(
-                        pc.text(State.model_options.max_tokens),
+                        pc.text(ModelOptionsState.max_tokens),
                         pc.slider(
                             min_=0,
                             max_=2048,
-                            default_value=State.model_options.max_tokens,
+                            default_value=ModelOptionsState.max_tokens,
+                            on_change_end=ModelOptionsState.set_max_tokens,
                         ),
                     ),
                 ),
@@ -1275,19 +1276,40 @@ def render_message_exploration(message_thread: MessageThread):
             pc.box(
                 pc.foreach(message_thread.messages, render_message),
                 pc.divider(margin="0.5em"),
-                pc.hstack(
-                    pc.text_area(
-                        placeholder="Write a message...",
-                        default_value="",
-                        width="100%",
-                        min_height="5em",
-                    ),
-                    pc.button(react_icon(as_="TbSend"), size="lg", variant="outline", float="right"),
+                pc.button(
+                    "Request Continuation",
                 ),
-                pc.divider(margin="0.5em"),
-                pc.flex(
-                    render_model_options(),
-                    width="100%",
+                pc.cond(
+                    State.chat_mode,
+                    pc.fragment(
+                        pc.divider(margin="0.5em"),
+                        pc.hstack(
+                            pc.text_area(
+                                placeholder="Write a message...",
+                                default_value="",
+                                width="100%",
+                                min_height="5em",
+                            ),
+                            pc.button(react_icon(as_="TbSend"), size="lg", variant="outline", float="right"),
+                        ),
+                    ),
+                ),
+                pc.box(
+                    pc.accordion(
+                        pc.accordion_item(
+                            pc.accordion_button(
+                                pc.hstack(
+                                    pc.heading("Model Options", size="sm"),
+                                    pc.accordion_icon(),
+                                    min_width="100%",
+                                ),
+                            ),
+                            pc.accordion_panel(
+                                render_model_options(),
+                            ),
+                        ),
+                    ),
+                    margin_top="0.5em",
                 ),
             ),
         ),
@@ -1457,14 +1479,12 @@ class State(pc.State):
     _message_exploration: MessageExploration = example_message_exploration.copy(deep=True)
     auto_focus_uid: str | None = None
 
-    model_options: ModelOptions = ModelOptions(
-        model_type="GPT-3.5",
-        temperature=0.7,
-        max_tokens=512,
-        top_p=1.0,
-        frequency_penalty=0.0,
-        presence_penalty=0.0,
-    )
+    @pc.var
+    def chat_mode(self) -> bool:
+        messages = self._message_exploration.current_message_thread.messages
+        if len(messages) == 0 or messages[-1].role != MessageRole.HUMAN:
+            return True
+        return False
 
     @property
     def message_map(self):
@@ -1563,7 +1583,6 @@ class EditableMessageState(State):
     def set_editable_message_content(self, content: str):
         assert self._editable_message is not None
         self._editable_message.content = content
-        print("new content", content)
 
     def set_editable_message_role(self, role: str):
         assert self._editable_message is not None
