@@ -1,4 +1,6 @@
 """Welcome to Pynecone! This file outlines the steps to create a basic app."""
+import asyncio
+import json
 import pprint  # noqa: F401
 import re
 import time
@@ -8,6 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict
 
+import openai
 import pydantic
 import pynecone as pc
 import pynecone.pc as cli
@@ -258,11 +261,38 @@ class MessageRole(str, Enum):
     HUMAN = "Human"
     BOT = "Bot"
 
+    @staticmethod
+    def openai_role(role) -> str:
+        if role == MessageRole.SYSTEM:
+            return "system"
+        elif role == MessageRole.HUMAN:
+            return "user"
+        elif role == MessageRole.BOT:
+            return "assistant"
+        else:
+            raise ValueError(f"Unknown message role {role}")
+
+
+model_map = {
+    "GPT-3.5": "gpt-3.5-turbo",
+    "GPT-4": "gpt-4",
+}
+
 
 class MessageSource(pc.Base):
     model_type: str | None = None
     model_dict: dict = {}
     edited: bool = False
+
+    def query_openai(self, openai_messages: list[dict]):
+        assert self.model_type is not None
+        response = openai.ChatCompletion.acreate(
+            messages=openai_messages,
+            model=model_map[self.model_type],
+            stream=True,
+            **self.model_dict,
+        )
+        return response
 
 
 class Message(pc.Base):
@@ -272,10 +302,16 @@ class Message(pc.Base):
     source: MessageSource
     creation_time: int
     content: str | None
-    error: str | None
+    error: str | None = None
 
     def compute_editable_style(self) -> 'StyledMessage':
         return StyledMessage.create(self, [], [])
+
+    def get_ai_prompt(self) -> dict:
+        return {
+            "role": MessageRole.openai_role(self.role),
+            "content": self.content,
+        }
 
 
 class LinkedMessage(pc.Base):
@@ -307,7 +343,9 @@ class StyledMessage(Message):
         elif message.role == MessageRole.BOT:
             align = "left"
             if message.source.model_type is not None:
-                background_color = ColorStyle.BOTS[sum(map(ord, message.source.model_type)) % len(ColorStyle.BOTS)]
+                background_color = ColorStyle.BOTS[
+                    list(model_map.keys()).index(message.source.model_type) % len(ColorStyle.BOTS)
+                ]
                 foreground_color = ColorStyle.HUMAN[1]
             else:
                 background_color, foreground_color = ColorStyle.HUMAN
@@ -424,6 +462,9 @@ class MessageExploration(pc.Base):
         return self._message_uid_map
 
     def __init__(self, **data):
+        assert 'message_threads' in data and len(data['message_threads']) > 0
+        if 'current_message_thread_uid' not in data:
+            data['current_message_thread_uid'] = data['message_threads'][0].uid
         super().__init__(**data)
         self._message_uid_map = self._compute_message_uid_map()
 
@@ -547,8 +588,6 @@ class MessageExploration(pc.Base):
             styled_messages.append(styled_message)
 
             message_thread_beam = new_message_thread_beam
-
-        # pprint.pprint(styled_messages)
 
         return StyledMessageThread(
             uid=current_message_thread.uid,
@@ -957,6 +996,70 @@ def render_static_message(message: StyledMessage):
     )
 
 
+def render_active_message(message: StyledMessage):
+    return pc.hstack(
+        pc.vstack(
+            pc.box(
+                pc.flex(
+                    pc.spacer(),
+                    pc.text(message.fmt_header),
+                    pc.spacer(),
+                    pc.text(message.fmt_creation_datetime),
+                    width="100%",
+                ),
+                background_color=message.background_color,
+                color=message.foreground_color,
+                border_radius="15px 0 0 0",
+                width="100%",
+                padding="0.25em 0.25em 0.25em 0.5em",
+                margin_bottom="0",
+            ),
+            pc.cond(
+                message.error,
+                pc.fragment(
+                    pc.cond(
+                        message.content,
+                        pc.box(
+                            render_static_message_content(message),
+                            border_radius="0 0 0 0",
+                            color=message.foreground_color,
+                            border_width="medium",
+                            border_color=message.foreground_color,
+                            width="100%",
+                            padding="0 0.25em 0 0.25em",
+                        ),
+                    ),
+                    pc.box(
+                        pc.markdown(message.error),
+                        border_radius="0 0 15px 0",
+                        color=message.foreground_color,
+                        background_color=SolarizedColors.red,
+                        width="100%",
+                        padding="0 0.25em 0 0.25em",
+                    ),
+                ),
+                pc.cond(
+                    message.content,
+                    pc.box(
+                        render_static_message_content(message),
+                        border_radius="0 0 15px 0",
+                        color=message.foreground_color,
+                        border_width="medium",
+                        border_color=message.foreground_color,
+                        width="100%",
+                        padding="0 0.25em 0 0.25em",
+                    ),
+                ),
+            ),
+            width="60ch",
+            padding_bottom="0.5em",
+            spacing="0em",
+        ),
+        justify_content=message.align,
+        width="100%",
+    )
+
+
 def render_editable_message(message: StyledMessage):
     return pc.hstack(
         pc.vstack(
@@ -1181,7 +1284,8 @@ def render_model_options():
                                 "GPT-3.5",
                                 "GPT-4",
                             ],
-                            default_value="GPT-3.5",
+                            default_value=ModelRequestsState.model_type,
+                            on_change=ModelRequestsState.set_model_type,
                         ),
                         style={"min-width": "20em"},
                     ),
@@ -1190,34 +1294,38 @@ def render_model_options():
                     pc.th("Temperature"),
                     pc.td(
                         float_slider(
-                            ModelOptionsState.temperature, ModelOptionsState.set_temperature, min_=0, max_=1, step=0.01
+                            ModelRequestsState.temperature,
+                            ModelRequestsState.set_temperature,
+                            min_=0,
+                            max_=1,
+                            step=0.01,
                         ),
                     ),
                 ),
                 pc.tr(
                     pc.th("Max Tokens"),
                     pc.td(
-                        pc.text(ModelOptionsState.max_tokens),
+                        pc.text(ModelRequestsState.max_tokens),
                         pc.slider(
                             min_=0,
                             max_=2048,
-                            default_value=ModelOptionsState.max_tokens,
-                            on_change_end=ModelOptionsState.set_max_tokens,
+                            default_value=ModelRequestsState.max_tokens,
+                            on_change_end=ModelRequestsState.set_max_tokens,
                         ),
                     ),
                 ),
                 pc.tr(
                     pc.th("Top P"),
                     pc.td(
-                        float_slider(ModelOptionsState.top_p, ModelOptionsState.set_top_p, min_=0, max_=1, step=0.01),
+                        float_slider(ModelRequestsState.top_p, ModelRequestsState.set_top_p, min_=0, max_=1, step=0.01),
                     ),
                 ),
                 pc.tr(
                     pc.th("Frequency Penalty"),
                     pc.td(
                         float_slider(
-                            ModelOptionsState.frequency_penalty,
-                            ModelOptionsState.set_frequency_penalty,
+                            ModelRequestsState.frequency_penalty,
+                            ModelRequestsState.set_frequency_penalty,
                             min_=0,
                             max_=2,
                             step=0.01,
@@ -1228,8 +1336,8 @@ def render_model_options():
                     pc.th("Presence Penalty"),
                     pc.td(
                         float_slider(
-                            ModelOptionsState.presence_penalty,
-                            ModelOptionsState.set_presence_penalty,
+                            ModelRequestsState.presence_penalty,
+                            ModelRequestsState.set_presence_penalty,
                             min_=0,
                             max_=1,
                             step=0.01,
@@ -1238,6 +1346,51 @@ def render_model_options():
                 ),
             ),
             width="50%",
+        ),
+    )
+
+
+def render_request_ui():
+    return pc.cond(
+        ~ModelRequestsState.active_generation,
+        pc.fragment(
+            pc.divider(margin="0.5em"),
+            pc.button(
+                "Request Continuation",
+                on_click=ModelRequestsState.request_chat_model_completion,
+            ),
+            pc.cond(
+                ModelRequestsState.chat_mode,
+                pc.fragment(
+                    pc.divider(margin="0.5em"),
+                    pc.hstack(
+                        pc.text_area(
+                            placeholder="Write a message...",
+                            default_value=ModelRequestsState.user_message_text,
+                            width="100%",
+                            min_height="5em",
+                            on_blur=ModelRequestsState.set_user_message_text,
+                        ),
+                        pc.button(
+                            react_icon(as_="TbSend"),
+                            size="lg",
+                            variant="outline",
+                            float="right",
+                            on_click=ModelRequestsState.submit_message,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        pc.fragment(
+            pc.cond(
+                ModelRequestsState.styled_active_message,
+                render_active_message(ModelRequestsState.styled_active_message),
+            ),
+            pc.button(
+                pc.spinner(color="blue", size="xs"),
+                pc.text("Cancel", margin_left="1em", on_click=ModelRequestsState.cancel_active_chat_completion),
+            ),
         ),
     )
 
@@ -1275,25 +1428,7 @@ def render_message_exploration(message_thread: MessageThread):
             render_message_grid(),
             pc.box(
                 pc.foreach(message_thread.messages, render_message),
-                pc.divider(margin="0.5em"),
-                pc.button(
-                    "Request Continuation",
-                ),
-                pc.cond(
-                    State.chat_mode,
-                    pc.fragment(
-                        pc.divider(margin="0.5em"),
-                        pc.hstack(
-                            pc.text_area(
-                                placeholder="Write a message...",
-                                default_value="",
-                                width="100%",
-                                min_height="5em",
-                            ),
-                            pc.button(react_icon(as_="TbSend"), size="lg", variant="outline", float="right"),
-                        ),
-                    ),
-                ),
+                render_request_ui(),
                 pc.box(
                     pc.accordion(
                         pc.accordion_item(
@@ -1464,11 +1599,10 @@ example_message_thread = MessageThread(
 
 example_message_exploration = MessageExploration(
     uid=UID.create(),
-    title="Untitled",
-    note="Blabla",
+    title="",
+    note="",
     tags=[],
-    current_message_thread_uid=example_message_thread.uid,
-    message_threads=[example_message_thread],
+    message_threads=[MessageThread(uid=UID.create())],
     hidden_message_thread_uids=set(),
 )
 
@@ -1478,13 +1612,6 @@ class State(pc.State):
 
     _message_exploration: MessageExploration = example_message_exploration.copy(deep=True)
     auto_focus_uid: str | None = None
-
-    @pc.var
-    def chat_mode(self) -> bool:
-        messages = self._message_exploration.current_message_thread.messages
-        if len(messages) == 0 or messages[-1].role != MessageRole.HUMAN:
-            return True
-        return False
 
     @property
     def message_map(self):
@@ -1596,7 +1723,6 @@ class EditableMessageState(State):
     def _edit_thread(self):
         original_message = self.message_map[self._editable_message.uid]
 
-        print(original_message, self._editable_message)
         if self._editable_message == original_message:
             return
 
@@ -1771,7 +1897,21 @@ class MessageGridState(State):
         return styled_grid_cells
 
 
-class ModelOptionsState(State):
+async def send_event(state: pc.State, event_handler: pc.event.EventHandler):
+    events = pc.event.fix_events([event_handler], state.get_token())
+    state_update = pc.state.StateUpdate(delta={}, events=events)
+    state_update_json = state_update.json()
+    await app.sio.emit(str(pc.constants.SocketEvent.EVENT), state_update_json, to=state.get_sid(), namespace="/event")
+
+
+# class PartialResponsePayload(typing.TypedDict):
+#     uid: str
+#     content: str
+
+PartialResponsePayload: typing.TypeAlias = dict[str, str]
+
+
+class ModelRequestsState(State):
     """The model options state."""
 
     model_type: str = "GPT-3.5"
@@ -1781,16 +1921,134 @@ class ModelOptionsState(State):
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
 
+    _active_message: Message | None = None
+    user_message_text: str = ""
+
+    @pc.var
+    def active_generation(self) -> bool:
+        return self._active_message is not None
+
+    @pc.var
+    def styled_active_message(self) -> StyledMessage | None:
+        if self._active_message is None:
+            return None
+        return self._active_message.compute_editable_style()
+
+    @pc.var
+    def chat_mode(self) -> bool:
+        messages = self._message_exploration.current_message_thread.messages
+        if len(messages) == 0 or messages[-1].role != MessageRole.HUMAN:
+            return True
+        return False
+
+    def cancel_active_chat_completion(self):
+        if self._active_message is None:
+            return
+        self._active_message.error = "Canceled by user."
+        self._message_exploration.current_message_thread.messages.append(self._active_message)
+        self._active_message = None
+        self.mark_dirty()
+
+    def receive_partial_response(self, payload_str: str):
+        # parse payload_str into a PartialResponsePayload using json.loads
+        payload: PartialResponsePayload = json.loads(payload_str)
+
+        if self._active_message is None or self._active_message.uid != payload['uid']:
+            return
+
+        if payload['content'] is None:
+            self._message_exploration.current_message_thread.messages.append(self._active_message)
+            self._active_message = None
+        else:
+            assert isinstance(payload['content'], str)
+            assert self._active_message.content is not None
+            self._active_message.content += payload['content']
+        self.mark_dirty()
+
+    def _request_chat_model_completion(self):
+        active_message = Message(
+            uid=UID.create(),
+            role=MessageRole.BOT,
+            content="",
+            creation_time=time.time(),
+            source=MessageSource(
+                model_type=self.model_type,
+                model_dict={
+                    "temperature": self.temperature,
+                    "max_tokens": self.max_tokens,
+                    "top_p": self.top_p,
+                    "frequency_penalty": self.frequency_penalty,
+                    "presence_penalty": self.presence_penalty,
+                },
+            ),
+        )
+
+        self._active_message = active_message
+
+        openai_messages = [
+            message.get_ai_prompt() for message in self._message_exploration.current_message_thread.messages
+        ]
+
+        async def _query_openai():
+            response = await active_message.source.query_openai(openai_messages=openai_messages)
+            async for partial_response in response:
+                if self._active_message is None or self._active_message.uid != active_message.uid:
+                    return
+
+                # finish reason?
+                if partial_response['choices'][0]['finish_reason'] == 'stop':
+                    break
+
+                delta = partial_response['choices'][0]['delta']
+
+                if 'role' in delta:
+                    assert delta['role'] == 'assistant'
+
+                if 'content' in delta:
+                    content = delta['content']
+                    # noinspection PyNoneFunctionAssignment,PyArgumentList
+                    event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
+                        PartialResponsePayload(
+                            uid=active_message.uid,
+                            content=content,
+                        )
+                    )
+                    await send_event(self, event_handler)
+
+            # noinspection PyNoneFunctionAssignment,PyArgumentList
+            event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
+                PartialResponsePayload(
+                    uid=active_message.uid,
+                    content=None,
+                )
+            )
+            await send_event(self, event_handler)
+
+        loop = asyncio.get_event_loop()
+        loop.create_task(_query_openai(), name="Query OpenAI Model")
+
+    def request_chat_model_completion(self):
+        self._request_chat_model_completion(self)
+
+    def submit_message(self):
+        user_message = Message(
+            uid=UID.create(),
+            role=MessageRole.HUMAN,
+            content=self.user_message_text,
+            creation_time=time.time(),
+            source=MessageSource(
+                model_type=None,
+            ),
+        )
+        self._message_exploration.current_message_thread.messages.append(user_message)
+        self.user_message_text = ""
+        self.mark_dirty()
+
+        self._request_chat_model_completion(self)
+
 
 def index() -> pc.Component:
     return pc.container(
-        pc.el.script(
-            """
-            import { extendTheme, withDefaultColorScheme } from '@chakra-ui/react'
-
-            const customTheme = extendTheme(withDefaultColorScheme({ colorScheme: 'red' }))
-            """
-        ),
         pc.vstack(
             render_message_exploration(State.styled_message_thread),
             width="100",
