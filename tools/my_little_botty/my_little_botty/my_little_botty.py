@@ -6,6 +6,7 @@ import types
 import typing
 from datetime import datetime
 from enum import Enum
+from typing import Dict
 
 import pydantic
 import pynecone as pc
@@ -395,6 +396,15 @@ class StyledGridCell(pc.Base):
     thread_uid: str
     col_span: int = 1
     skip: bool = False
+
+
+class ModelOptions(pc.Base):
+    model_type: str
+    max_tokens: int
+    temperature: float
+    top_p: float
+    presence_penalty: float
+    frequency_penalty: float
 
 
 class MessageExploration(pc.Base):
@@ -1124,6 +1134,113 @@ def render_note_editor():
     )
 
 
+# BUG(blackhc): https://github.com/pynecone-io/pynecone/issues/925
+class FixedSlider(pc.Slider):
+    @classmethod
+    def get_controlled_triggers(cls) -> Dict[str, Var]:
+        return {}
+
+    def get_triggers(cls) -> set[str]:
+        return {"on_change_end"}
+
+
+fixed_slider = FixedSlider.create
+
+
+def float_slider(value: Var[float], setter, min_: float, max_: float, step: float = 0.01):
+    def on_change_end(final_value: Var[int]):
+        event_spec: pc.event.EventSpec = setter(final_value * step + min_)
+        return event_spec.copy(update=dict(local_args={final_value.name}))
+
+    return pc.fragment(
+        pc.text(BaseVar(name=f"{value.full_name}.toFixed(2)", type_=str)),
+        fixed_slider(
+            min_=0,
+            max_=int((max_ - min_ + step / 2) // step),
+            default_value=((value - min_ + step / 2) // step).to(int),
+            on_change_end=on_change_end(pc.EVENT_ARG),
+        ),
+    )
+
+
+def render_model_options():
+    return pc.table_container(
+        pc.table(
+            # pc.thead(
+            #     pc.tr(
+            #         pc.th("Name"),
+            #         pc.th("Age"),
+            #     )
+            # ),
+            pc.tbody(
+                pc.tr(
+                    pc.th("Model"),
+                    pc.td(
+                        pc.select(
+                            options=[
+                                "GPT-3.5",
+                                "GPT-4",
+                            ],
+                            default_value="GPT-3.5",
+                        ),
+                        style={"min-width": "20em"},
+                    ),
+                ),
+                pc.tr(
+                    pc.th("Temperature"),
+                    pc.td(
+                        float_slider(
+                            ModelOptionsState.temperature, ModelOptionsState.set_temperature, min_=0, max_=1, step=0.01
+                        ),
+                    ),
+                ),
+                pc.tr(
+                    pc.th("Max Length"),
+                    pc.td(
+                        pc.text(State.model_options.max_tokens),
+                        pc.slider(
+                            min_=0,
+                            max_=2048,
+                            default_value=State.model_options.max_tokens,
+                        ),
+                    ),
+                ),
+                pc.tr(
+                    pc.th("Top P"),
+                    pc.td(
+                        float_slider(ModelOptionsState.top_p, ModelOptionsState.set_top_p, min_=0, max_=1, step=0.01),
+                    ),
+                ),
+                pc.tr(
+                    pc.th("Frequency Penalty"),
+                    pc.td(
+                        float_slider(
+                            ModelOptionsState.frequency_penalty,
+                            ModelOptionsState.set_frequency_penalty,
+                            min_=0,
+                            max_=2,
+                            step=0.01,
+                        ),
+                    ),
+                ),
+                pc.tr(
+                    pc.th("Presence Penalty"),
+                    pc.td(
+                        float_slider(
+                            ModelOptionsState.presence_penalty,
+                            ModelOptionsState.set_presence_penalty,
+                            min_=0,
+                            max_=1,
+                            step=0.01,
+                        ),
+                    ),
+                ),
+            ),
+            width="50%",
+        ),
+    )
+
+
 def render_message_exploration(message_thread: MessageThread):
     return pc.box(
         pc.hstack(
@@ -1169,90 +1286,7 @@ def render_message_exploration(message_thread: MessageThread):
                 ),
                 pc.divider(margin="0.5em"),
                 pc.flex(
-                    pc.button("Generate new message"),
-                    pc.spacer(),
-                    pc.divider(margin="0.5em", orientation="vertical"),
-                    pc.table_container(
-                        pc.table(
-                            # pc.thead(
-                            #     pc.tr(
-                            #         pc.th("Name"),
-                            #         pc.th("Age"),
-                            #     )
-                            # ),
-                            pc.tbody(
-                                pc.tr(
-                                    pc.th("Model"),
-                                    pc.td(
-                                        pc.select(
-                                            options=[
-                                                "GPT-3.5",
-                                                "GPT-4",
-                                            ],
-                                            default_value="GPT-3.5",
-                                        ),
-                                        style={"min-width": "20em"},
-                                    ),
-                                ),
-                                pc.tr(
-                                    pc.th("Temperature"),
-                                    pc.td(
-                                        pc.text("0.5"),
-                                        pc.slider(
-                                            min_=0,
-                                            max_=100,
-                                            default_value=50,
-                                        ),
-                                    ),
-                                ),
-                                pc.tr(
-                                    pc.th("Max Length"),
-                                    pc.td(
-                                        pc.text("512"),
-                                        pc.slider(
-                                            min_=0,
-                                            max_=2048,
-                                            default_value=512,
-                                        ),
-                                    ),
-                                ),
-                                pc.tr(
-                                    pc.th("Top P"),
-                                    pc.td(
-                                        pc.text("1.0"),
-                                        pc.slider(
-                                            min_=0,
-                                            max_=100,
-                                            default_value=100,
-                                        ),
-                                    ),
-                                ),
-                                pc.tr(
-                                    pc.th("Frequence Penalty"),
-                                    pc.td(
-                                        pc.text("0.0"),
-                                        pc.slider(
-                                            min_=0,
-                                            max_=200,
-                                            default_value=0,
-                                        ),
-                                    ),
-                                ),
-                                pc.tr(
-                                    pc.th("Presence Penalty"),
-                                    pc.td(
-                                        pc.text("0.0"),
-                                        pc.slider(
-                                            min_=0,
-                                            max_=200,
-                                            default_value=0,
-                                        ),
-                                    ),
-                                ),
-                            ),
-                            width="50%",
-                        ),
-                    ),
+                    render_model_options(),
                     width="100%",
                 ),
             ),
@@ -1422,6 +1456,15 @@ class State(pc.State):
 
     _message_exploration: MessageExploration = example_message_exploration.copy(deep=True)
     auto_focus_uid: str | None = None
+
+    model_options: ModelOptions = ModelOptions(
+        model_type="GPT-3.5",
+        temperature=0.7,
+        max_tokens=512,
+        top_p=1.0,
+        frequency_penalty=0.0,
+        presence_penalty=0.0,
+    )
 
     @property
     def message_map(self):
@@ -1709,8 +1752,26 @@ class MessageGridState(State):
         return styled_grid_cells
 
 
+class ModelOptionsState(State):
+    """The model options state."""
+
+    model_type: str = "GPT-3.5"
+    temperature: float = 0.7
+    max_tokens: int = 512
+    top_p: float = 1.0
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
+
+
 def index() -> pc.Component:
     return pc.container(
+        pc.el.script(
+            """
+            import { extendTheme, withDefaultColorScheme } from '@chakra-ui/react'
+
+            const customTheme = extendTheme(withDefaultColorScheme({ colorScheme: 'red' }))
+            """
+        ),
         pc.vstack(
             render_message_exploration(State.styled_message_thread),
             width="100",
