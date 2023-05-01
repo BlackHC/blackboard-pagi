@@ -7,5 +7,6 @@ config = pc.Config(
     frontend_packages=[
         "react-object-view",
         "react-json-view-lite",
+        "react-icons",
     ],
 )

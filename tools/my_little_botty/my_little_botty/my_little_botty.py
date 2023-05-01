@@ -1,5 +1,6 @@
 """Welcome to Pynecone! This file outlines the steps to create a basic app."""
 import pprint  # noqa: F401
+import re
 import time
 import types
 import typing
@@ -11,6 +12,8 @@ import pynecone as pc
 import pynecone.pc as cli
 from pydantic.fields import ModelField
 from pynecone import Var
+from pynecone.components.media.icon import ChakraIconComponent
+from pynecone.utils.imports import ImportDict, merge_imports
 from pynecone.var import BaseVar, ComputedVar
 
 
@@ -174,6 +177,44 @@ class TypedComputedVar(TypedVar, property):
 
 pc.var = TypedComputedVar
 ComputedVar.register(pc.var)
+
+
+class ReactIcon(ChakraIconComponent):
+    """An image icon."""
+
+    tag: str = "Icon"
+    as_: Var[pc.EventChain]
+
+    @classmethod
+    def create(cls, *children, as_: str, **props):
+        """Initialize the Icon component.
+
+        Run some additional checks on Icon component.
+
+        Args:
+            children: The positional arguments
+            props: The keyword arguments
+
+        Raises:
+            AttributeError: The errors tied to bad usage of the Icon component.
+            ValueError: If the icon tag is invalid.
+
+        Returns:
+            The created component.
+        """
+        as_var = TypedBaseVar(name=as_, type_=pc.EventChain)
+        return super().create(*children, as_=as_var, **props)
+
+    def _get_imports(self) -> ImportDict:
+        icon_name = self.as_.name
+        # the icon name uses camel case, e.g. BsThreeDotsVertical. The first part (Bs) is the icon sub package
+        # convert camel case to snake case
+        camel_case = re.sub(r"(?<!^)(?=[A-Z])", "_", icon_name).lower()
+        icon_sub_package = camel_case.split("_")[0]
+        return merge_imports(super()._get_imports(), {f"react-icons/{icon_sub_package}": {self.as_.name}})
+
+
+react_icon = ReactIcon.create
 
 
 # solarized colors as HTML hex
@@ -571,7 +612,7 @@ def render_message_toolbar(message: StyledMessage):
                 ),
             ),
             pc.button(
-                pc.icon(tag="drag_handle"),
+                react_icon(as_="ImTree"),
                 size='xs',
                 variant='ghost',
                 is_disabled=EditableMessageState.is_editing
@@ -796,6 +837,7 @@ def render_grid_column_button(thread_uid: str, index):
             row_span=1,
             col_start=index.to(int) + 1,
             col_span=1,
+            on_click=lambda: MessageGridState.remove_thread(thread_uid),  # type: ignore
         ),
         pc.grid_item(
             pc.button(
@@ -804,7 +846,8 @@ def render_grid_column_button(thread_uid: str, index):
                 on_click=lambda: MessageGridState.go_to_thread(thread_uid),  # type: ignore
                 variant="ghost",
                 opacity=0.5,
-                min_width="30ch",
+                minWidth="30ch",
+                min_height="30ch",
             ),
             row_start=2,
             row_span=MessageGridState.styled_grid_cells.length(),
@@ -1049,25 +1092,48 @@ def render_message_thread_menu(message_thread: MessageThread):
     )
 
 
-def render_message_exploration(message_thread: MessageThread):
-    note_editor = pc.cond(
+def render_note_editor():
+    return pc.cond(
         ~MessageExplorationState.note_editor,
-        pc.markdown(MessageExplorationState.note),
+        pc.button(
+            pc.flex(
+                pc.cond(
+                    MessageExplorationState.note,
+                    pc.markdown(MessageExplorationState.note),
+                    pc.markdown("Add a note here...", color=SolarizedColors.base1),
+                ),
+                pc.spacer(),
+                pc.icon(tag="edit", size="xs"),
+                width="100%",
+                style={"font-weight": "normal"},
+            ),
+            on_click=MessageExplorationState.start_note_editing(None),
+            variant="ghost",
+            width="100%",
+            padding="0.25em",
+        ),
         pc.editable(
             pc.editable_preview(),
             pc.editable_textarea(),
             start_with_edit_view=True,
             default_value=MessageExplorationState.note,
             on_submit=MessageExplorationState.update_note,
-            on_cancel=MessageExplorationState.toggle_note_editor,
+            on_cancel=MessageExplorationState.cancel_note_editing,
+            margin="0.25em",
         ),
     )
+
+
+def render_message_exploration(message_thread: MessageThread):
     return pc.box(
         pc.hstack(
             pc.fragment(
                 render_message_thread_menu(message_thread),
                 pc.button(
-                    pc.icon(tag="drag_handle"), size='xs', variant='ghost', on_click=MessageGridState.toggle_grid
+                    react_icon(as_="BsFillGrid3X3GapFill"),
+                    size='xs',
+                    variant='ghost',
+                    on_click=MessageGridState.toggle_grid,
                 ),
             ),
             pc.heading(
@@ -1081,20 +1147,8 @@ def render_message_exploration(message_thread: MessageThread):
             ),
         ),
         pc.divider(margin="0.5em"),
-        pc.hstack(
-            pc.heading("Notes", size="sm"),
-            pc.cond(
-                ~MessageExplorationState.note_editor,
-                pc.button(
-                    pc.icon(tag="edit"),
-                    size='xs',
-                    variant="ghost",
-                    on_click=lambda: MessageExplorationState.toggle_note_editor(None),  # type: ignore
-                ),
-            ),
-        ),
         pc.box(
-            note_editor,
+            render_note_editor(),
             padding="0.5em",
         ),
         pc.divider(margin="0.5em"),
@@ -1111,7 +1165,7 @@ def render_message_exploration(message_thread: MessageThread):
                         width="100%",
                         min_height="5em",
                     ),
-                    pc.button(pc.icon(tag="phone"), size="lg", variant="outline", float="right"),
+                    pc.button(react_icon(as_="TbSend"), size="lg", variant="outline", float="right"),
                 ),
                 pc.divider(margin="0.5em"),
                 pc.flex(
@@ -1366,7 +1420,7 @@ example_message_exploration = MessageExploration(
 class State(pc.State):
     """The app state."""
 
-    _message_exploration: MessageExploration = example_message_exploration
+    _message_exploration: MessageExploration = example_message_exploration.copy(deep=True)
     auto_focus_uid: str | None = None
 
     @property
@@ -1381,8 +1435,12 @@ class State(pc.State):
 class MessageExplorationState(State):
     note_editor: bool = False
 
-    def toggle_note_editor(self, _: typing.Any):
-        self.note_editor = not self.note_editor
+    def cancel_note_editing(self, _: typing.Any):
+        self.note_editor = False
+        self.mark_dirty()
+
+    def start_note_editing(self, _: typing.Any):
+        self.note_editor = True
         self.mark_dirty()
 
     @pc.var
@@ -1586,6 +1644,11 @@ class MessageOverviewState(State):
 
 class MessageGridState(State):
     _grid: MessageGrid | None = None
+
+    def remove_thread(self, thread_uid: str):
+        self._message_exploration.delete_message_thread(thread_uid)
+        self._grid = self._message_exploration.get_message_grid()
+        self.mark_dirty()
 
     def toggle_grid(self):
         if self._grid is None:
