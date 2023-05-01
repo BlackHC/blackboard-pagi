@@ -328,9 +328,6 @@ class StyledMessage(Message):
 
 class MessageThread(pc.Base):
     uid: str
-    title: str = "Untitled"
-    note: str = ""
-    tags: list[str] = pydantic.Field(default_factory=list)
     messages: list[Message] = pydantic.Field(default_factory=list)
 
     def get_message_by_uid(self, uid: str) -> Message | None:
@@ -361,6 +358,10 @@ class StyledGridCell(pc.Base):
 
 class MessageExploration(pc.Base):
     uid: str
+    title: str = "Untitled"
+    note: str = ""
+    tags: list[str] = pydantic.Field(default_factory=list)
+
     current_message_thread_uid: str
     message_threads: list[MessageThread]
     hidden_message_thread_uids: set[str] = pydantic.Field(default_factory=set)
@@ -500,9 +501,6 @@ class MessageExploration(pc.Base):
 
         return StyledMessageThread(
             uid=current_message_thread.uid,
-            title=current_message_thread.title,
-            note=current_message_thread.note,
-            tags=current_message_thread.tags,
             messages=styled_messages,
         )
 
@@ -573,7 +571,7 @@ def render_message_toolbar(message: StyledMessage):
                 ),
             ),
             pc.button(
-                pc.icon(tag="search"),
+                pc.icon(tag="drag_handle"),
                 size='xs',
                 variant='ghost',
                 is_disabled=EditableMessageState.is_editing
@@ -771,7 +769,7 @@ def render_grid_cell(styled_grid_cell: StyledGridCell):
                     spacing="0em",
                 ),
             ),
-            row_start=styled_grid_cell.row_idx,
+            row_start=styled_grid_cell.row_idx + 1,
             col_start=styled_grid_cell.col_idx,
             col_span=styled_grid_cell.col_span,
             justify_self="center",
@@ -791,19 +789,28 @@ def render_grid_row(message_row: list[StyledGridCell]):
 
 
 def render_grid_column_button(thread_uid: str, index):
-    return pc.grid_item(
-        pc.button(
-            width="100%",
-            height="100%",
-            on_click=lambda: MessageGridState.go_to_thread(thread_uid),  # type: ignore
-            variant="ghost",
-            opacity=0.5,
-            min_width="30ch",
+    return pc.fragment(
+        pc.grid_item(
+            pc.button(pc.icon(tag="delete"), variant="outline", margin="1em"),
+            row_start=1,
+            row_span=1,
+            col_start=index.to(int) + 1,
+            col_span=1,
         ),
-        row_start=1,
-        row_span=MessageGridState.styled_grid_cells.length(),
-        col_start=index.to(int) + 1,
-        col_span=1,
+        pc.grid_item(
+            pc.button(
+                width="100%",
+                height="100%",
+                on_click=lambda: MessageGridState.go_to_thread(thread_uid),  # type: ignore
+                variant="ghost",
+                opacity=0.5,
+                min_width="30ch",
+            ),
+            row_start=2,
+            row_span=MessageGridState.styled_grid_cells.length(),
+            col_start=index.to(int) + 1,
+            col_span=1,
+        ),
     )
 
 
@@ -836,6 +843,10 @@ def render_static_message(message: StyledMessage):
                     render_message_toolbar(message),
                     pc.spacer(),
                     pc.text(message.fmt_header),
+                    pc.cond(
+                        message.role == "System",
+                        pc.button(pc.icon(tag="info"), size="xs", variant="outline"),
+                    ),
                     pc.spacer(),
                     pc.text(message.fmt_creation_datetime),
                     width="100%",
@@ -844,7 +855,7 @@ def render_static_message(message: StyledMessage):
                 color=message.foreground_color,
                 border_radius="15px 0 0 0",
                 width="100%",
-                padding="0.25em 0.25em 0 0.5em",
+                padding="0.25em 0.25em 0.25em 0.5em",
                 margin_bottom="0",
             ),
             pc.cond(
@@ -1029,33 +1040,167 @@ def render_message_thread_menu(message_thread: MessageThread):
                     pc.divider(orientation="vertical", height="1em"),
                     pc.button(pc.icon(tag="lock"), size='xs', variant='ghost'),
                     pc.button(pc.icon(tag="edit"), size='xs', variant='ghost'),
-                    pc.divider(orientation="vertical", height="1em"),
-                    pc.button(
-                        pc.icon(tag="drag_handle"), size='xs', variant='ghost', on_click=MessageGridState.toggle_grid
-                    ),
                 )
             ),
             pc.popover_close_button(),
-            width='20em',
+            width='17em',
         ),
         trigger="hover",
     )
 
 
 def render_message_exploration(message_thread: MessageThread):
+    note_editor = pc.cond(
+        ~MessageExplorationState.note_editor,
+        pc.markdown(MessageExplorationState.note),
+        pc.editable(
+            pc.editable_preview(),
+            pc.editable_textarea(),
+            start_with_edit_view=True,
+            default_value=MessageExplorationState.note,
+            on_submit=MessageExplorationState.update_note,
+            on_cancel=MessageExplorationState.toggle_note_editor,
+        ),
+    )
     return pc.box(
         pc.hstack(
-            render_message_thread_menu(message_thread),
-            pc.heading(message_thread.title, size="md"),
+            pc.fragment(
+                render_message_thread_menu(message_thread),
+                pc.button(
+                    pc.icon(tag="drag_handle"), size='xs', variant='ghost', on_click=MessageGridState.toggle_grid
+                ),
+            ),
+            pc.heading(
+                pc.editable(
+                    pc.editable_preview(),
+                    pc.editable_input(),
+                    default_value=MessageExplorationState.title,
+                    placeholder="Untitled",
+                ),
+                size="md",
+            ),
         ),
         pc.divider(margin="0.5em"),
-        pc.markdown(message_thread.note),
+        pc.hstack(
+            pc.heading("Notes", size="sm"),
+            pc.cond(
+                ~MessageExplorationState.note_editor,
+                pc.button(
+                    pc.icon(tag="edit"),
+                    size='xs',
+                    variant="ghost",
+                    on_click=lambda: MessageExplorationState.toggle_note_editor(None),  # type: ignore
+                ),
+            ),
+        ),
+        pc.box(
+            note_editor,
+            padding="0.5em",
+        ),
         pc.divider(margin="0.5em"),
         pc.cond(
             MessageGridState.is_grid_visible,
             render_message_grid(),
             pc.box(
                 pc.foreach(message_thread.messages, render_message),
+                pc.divider(margin="0.5em"),
+                pc.hstack(
+                    pc.text_area(
+                        placeholder="Write a message...",
+                        default_value="",
+                        width="100%",
+                        min_height="5em",
+                    ),
+                    pc.button(pc.icon(tag="phone"), size="lg", variant="outline", float="right"),
+                ),
+                pc.divider(margin="0.5em"),
+                pc.flex(
+                    pc.button("Generate new message"),
+                    pc.spacer(),
+                    pc.divider(margin="0.5em", orientation="vertical"),
+                    pc.table_container(
+                        pc.table(
+                            # pc.thead(
+                            #     pc.tr(
+                            #         pc.th("Name"),
+                            #         pc.th("Age"),
+                            #     )
+                            # ),
+                            pc.tbody(
+                                pc.tr(
+                                    pc.th("Model"),
+                                    pc.td(
+                                        pc.select(
+                                            options=[
+                                                "GPT-3.5",
+                                                "GPT-4",
+                                            ],
+                                            default_value="GPT-3.5",
+                                        ),
+                                        style={"min-width": "20em"},
+                                    ),
+                                ),
+                                pc.tr(
+                                    pc.th("Temperature"),
+                                    pc.td(
+                                        pc.text("0.5"),
+                                        pc.slider(
+                                            min_=0,
+                                            max_=100,
+                                            default_value=50,
+                                        ),
+                                    ),
+                                ),
+                                pc.tr(
+                                    pc.th("Max Length"),
+                                    pc.td(
+                                        pc.text("512"),
+                                        pc.slider(
+                                            min_=0,
+                                            max_=2048,
+                                            default_value=512,
+                                        ),
+                                    ),
+                                ),
+                                pc.tr(
+                                    pc.th("Top P"),
+                                    pc.td(
+                                        pc.text("1.0"),
+                                        pc.slider(
+                                            min_=0,
+                                            max_=100,
+                                            default_value=100,
+                                        ),
+                                    ),
+                                ),
+                                pc.tr(
+                                    pc.th("Frequence Penalty"),
+                                    pc.td(
+                                        pc.text("0.0"),
+                                        pc.slider(
+                                            min_=0,
+                                            max_=200,
+                                            default_value=0,
+                                        ),
+                                    ),
+                                ),
+                                pc.tr(
+                                    pc.th("Presence Penalty"),
+                                    pc.td(
+                                        pc.text("0.0"),
+                                        pc.slider(
+                                            min_=0,
+                                            max_=200,
+                                            default_value=0,
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            width="50%",
+                        ),
+                    ),
+                    width="100%",
+                ),
             ),
         ),
         width="100%",
@@ -1081,9 +1226,6 @@ class UID:
 
 example_message_thread = MessageThread(
     uid=UID.create(),
-    title="Untitled",
-    note="",
-    tags=[],
     messages=[
         Message(
             uid=UID.create(),
@@ -1212,6 +1354,9 @@ example_message_thread = MessageThread(
 
 example_message_exploration = MessageExploration(
     uid=UID.create(),
+    title="Untitled",
+    note="Blabla",
+    tags=[],
     current_message_thread_uid=example_message_thread.uid,
     message_threads=[example_message_thread],
     hidden_message_thread_uids=set(),
@@ -1231,6 +1376,31 @@ class State(pc.State):
     @pc.var
     def styled_message_thread(self) -> StyledMessageThread:
         return self._message_exploration.get_styled_current_message_thread()
+
+
+class MessageExplorationState(State):
+    note_editor: bool = False
+
+    def toggle_note_editor(self, _: typing.Any):
+        self.note_editor = not self.note_editor
+        self.mark_dirty()
+
+    @pc.var
+    def note(self) -> str:
+        return self._message_exploration.note
+
+    @pc.var
+    def title(self) -> str:
+        return self._message_exploration.title
+
+    def update_note(self, content):
+        self._message_exploration.note = content
+        self.note_editor = False
+        self.mark_dirty()
+
+    def update_title(self, content):
+        self._message_exploration.title = content
+        self.mark_dirty()
 
 
 class NavigationState(State):
