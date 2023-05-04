@@ -290,6 +290,7 @@ class MessageSource(pc.Base):
             messages=openai_messages,
             model=model_map[self.model_type],
             stream=True,
+            request_timeout=20,
             **self.model_dict,
         )
         return response
@@ -486,6 +487,11 @@ class MessageExploration(pc.Base):
         # update the message uid map
         self._message_uid_map = self._compute_message_uid_map()
 
+    def add_message(self, message: Message):
+        # add the message to the current message thread
+        self.current_message_thread.messages.append(message)
+        self._message_uid_map = self._compute_message_uid_map()
+
     def delete_message_thread(self, message_thread_uid: str):
         """
         Remove the message thread with the given uid from the list of message threads.
@@ -514,7 +520,7 @@ class MessageExploration(pc.Base):
         else:
             self.hidden_message_thread_uids.add(message_thread_uid)
 
-    def _deduplicate_message_threads(self, message_threads, row):
+    def _grid_deduplicate_message_threads(self, message_threads, row):
         cleaned_message_threads = []
         message_uids = set()
         for message_thread in message_threads:
@@ -569,7 +575,7 @@ class MessageExploration(pc.Base):
             #    3. message threads that come after the current message thread
 
             message_threads = [mt for mt in message_thread_beam]
-            message_threads = self._deduplicate_message_threads(message_threads, row)
+            message_threads = self._grid_deduplicate_message_threads(message_threads, row)
 
             # obtain the index of the current message thread in the new message thread beam
             current_message_idx = next(
@@ -601,11 +607,6 @@ class MessageExploration(pc.Base):
                 stored_message = message_uid_map.setdefault(message.uid, message)
                 assert stored_message == message
         return message_uid_map
-
-
-def render_static_message_content(message: StyledMessage):
-    is_not_bot = message.role != "Bot"
-    return pc.cond(is_not_bot, pc.markdown(message.content), pc.cond(message.content, pc.markdown(message.content)))
 
 
 def render_edit_thread_button(message: StyledMessage):
@@ -724,7 +725,7 @@ def render_carousel_message(message: StyledMessage):
                             ),
                         ),
                         pc.box(
-                            pc.markdown(message.error),
+                            render_markdown(message.error),
                             border_radius="0 0 15px 15px",
                             color=message.foreground_color,
                             background_color=SolarizedColors.red,
@@ -761,11 +762,12 @@ def render_carousel_message(message: StyledMessage):
     )
 
 
-def render_markdown(content: str | None):
+def render_markdown(content: str | None, **props):
     return pc.box(
-        pc.cond(content, pc.markdown(content)),
+        pc.cond(content, pc.markdown(content), pc.text("")),
         max_height="50vh",
         style={"word-wrap": "break-word", "white-space": "pre-wrap", "text-align": "left", "overflow": "scroll"},
+        **props,
     )
 
 
@@ -832,7 +834,7 @@ def render_grid_cell(styled_grid_cell: StyledGridCell):
                                 ),
                             ),
                             pc.box(
-                                pc.markdown(message.error),
+                                render_markdown(message.error),
                                 border_radius="0 0 15px 15px",
                                 color=message.foreground_color,
                                 background_color=SolarizedColors.red,
@@ -910,8 +912,8 @@ def render_message_grid():
     return pc.flex(
         pc.box(
             pc.grid(
-                pc.foreach(MessageGridState.styled_grid_cells, render_grid_row),
                 pc.foreach(MessageGridState.column_thread_uids, render_grid_column_button),
+                pc.foreach(MessageGridState.styled_grid_cells, render_grid_row),
                 width="fit-content",
                 zoom="0.75",
             ),
@@ -956,7 +958,7 @@ def render_static_message(message: StyledMessage):
                     pc.cond(
                         message.content,
                         pc.box(
-                            render_static_message_content(message),
+                            render_markdown(message.content),
                             border_radius="0 0 0 0",
                             color=message.foreground_color,
                             border_width="medium",
@@ -966,7 +968,7 @@ def render_static_message(message: StyledMessage):
                         ),
                     ),
                     pc.box(
-                        pc.markdown(message.error),
+                        render_markdown(message.error),
                         border_radius="0 0 15px 0",
                         color=message.foreground_color,
                         background_color=SolarizedColors.red,
@@ -977,7 +979,7 @@ def render_static_message(message: StyledMessage):
                 pc.cond(
                     message.content,
                     pc.box(
-                        render_static_message_content(message),
+                        render_markdown(message.content),
                         border_radius="0 0 15px 0",
                         color=message.foreground_color,
                         border_width="medium",
@@ -1020,7 +1022,7 @@ def render_active_message(message: StyledMessage):
                     pc.cond(
                         message.content,
                         pc.box(
-                            render_static_message_content(message),
+                            render_markdown(message.content),
                             border_radius="0 0 0 0",
                             color=message.foreground_color,
                             border_width="medium",
@@ -1030,7 +1032,7 @@ def render_active_message(message: StyledMessage):
                         ),
                     ),
                     pc.box(
-                        pc.markdown(message.error),
+                        render_markdown(message.error),
                         border_radius="0 0 15px 0",
                         color=message.foreground_color,
                         background_color=SolarizedColors.red,
@@ -1041,7 +1043,7 @@ def render_active_message(message: StyledMessage):
                 pc.cond(
                     message.content,
                     pc.box(
-                        render_static_message_content(message),
+                        render_markdown(message.content),
                         border_radius="0 0 15px 0",
                         color=message.foreground_color,
                         border_width="medium",
@@ -1108,7 +1110,7 @@ def render_editable_message_error(message):
     return pc.box(
         pc.flex(
             pc.box(
-                pc.markdown(message.error),
+                render_markdown(message.error),
             ),
             pc.spacer(),
             pc.button(
@@ -1212,7 +1214,7 @@ def render_note_editor():
             pc.flex(
                 pc.cond(
                     MessageExplorationState.note,
-                    pc.markdown(MessageExplorationState.note),
+                    render_markdown(MessageExplorationState.note),
                     pc.markdown("Add a note here...", color=SolarizedColors.base1),
                 ),
                 pc.spacer(),
@@ -1945,7 +1947,7 @@ class ModelRequestsState(State):
         if self._active_message is None:
             return
         self._active_message.error = "Canceled by user."
-        self._message_exploration.current_message_thread.messages.append(self._active_message)
+        self._message_exploration.add_message(self._active_message)
         self._active_message = None
         self.mark_dirty()
 
@@ -1957,12 +1959,24 @@ class ModelRequestsState(State):
             return
 
         if payload['content'] is None:
-            self._message_exploration.current_message_thread.messages.append(self._active_message)
+            self._message_exploration.add_message(self._active_message)
             self._active_message = None
         else:
             assert isinstance(payload['content'], str)
             assert self._active_message.content is not None
             self._active_message.content += payload['content']
+        self.mark_dirty()
+
+    def receive_error(self, payload_str: str):
+        # parse payload_str into a PartialResponsePayload using json.loads
+        payload: PartialResponsePayload = json.loads(payload_str)
+
+        if self._active_message is None or self._active_message.uid != payload['uid']:
+            return
+
+        self._active_message.error = payload['content']
+        self._message_exploration.add_message(self._active_message)
+        self._active_message = None
         self.mark_dirty()
 
     def _request_chat_model_completion(self):
@@ -1990,39 +2004,61 @@ class ModelRequestsState(State):
         ]
 
         async def _query_openai():
-            response = await active_message.source.query_openai(openai_messages=openai_messages)
-            async for partial_response in response:
-                if self._active_message is None or self._active_message.uid != active_message.uid:
-                    return
+            try:
+                response = await active_message.source.query_openai(openai_messages=openai_messages)
+                async for partial_response in response:
+                    if self._active_message is None or self._active_message.uid != active_message.uid:
+                        return
 
-                # finish reason?
-                if partial_response['choices'][0]['finish_reason'] == 'stop':
-                    break
+                    # finish reason?
+                    if partial_response['choices'][0]['finish_reason'] == 'stop':
+                        break
 
-                delta = partial_response['choices'][0]['delta']
+                    delta = partial_response['choices'][0]['delta']
 
-                if 'role' in delta:
-                    assert delta['role'] == 'assistant'
+                    if 'role' in delta:
+                        assert delta['role'] == 'assistant'
 
-                if 'content' in delta:
-                    content = delta['content']
-                    # noinspection PyNoneFunctionAssignment,PyArgumentList
-                    event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
-                        PartialResponsePayload(
-                            uid=active_message.uid,
-                            content=content,
+                    if 'content' in delta:
+                        content = delta['content']
+                        # noinspection PyNoneFunctionAssignment,PyArgumentList
+                        event_handler: pc.event.EventHandler = (
+                            ModelRequestsState.receive_partial_response(  # type: ignore
+                                PartialResponsePayload(
+                                    uid=active_message.uid,
+                                    content=content,
+                                )
+                            )
                         )
-                    )
-                    await send_event(self, event_handler)
+                        await send_event(self, event_handler)
 
-            # noinspection PyNoneFunctionAssignment,PyArgumentList
-            event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
-                PartialResponsePayload(
-                    uid=active_message.uid,
-                    content=None,
+                # noinspection PyNoneFunctionAssignment,PyArgumentList
+                event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
+                    PartialResponsePayload(
+                        uid=active_message.uid,
+                        content=None,
+                    )
                 )
-            )
-            await send_event(self, event_handler)
+                await send_event(self, event_handler)
+            except asyncio.TimeoutError:
+                # noinspection PyNoneFunctionAssignment,PyArgumentList
+                event_handler: pc.event.EventHandler = ModelRequestsState.receive_error(  # type: ignore
+                    PartialResponsePayload(
+                        uid=active_message.uid,
+                        content="Request Timeout Error",
+                    )
+                )
+                await send_event(self, event_handler)
+            except Exception as e:
+                # noinspection PyNoneFunctionAssignment,PyArgumentList
+                event_handler: pc.event.EventHandler = ModelRequestsState.receive_error(  # type: ignore
+                    PartialResponsePayload(
+                        uid=active_message.uid,
+                        content=str(e),
+                    )
+                )
+                await send_event(self, event_handler)
+                raise
 
         loop = asyncio.get_event_loop()
         loop.create_task(_query_openai(), name="Query OpenAI Model")
@@ -2040,7 +2076,7 @@ class ModelRequestsState(State):
                 model_type=None,
             ),
         )
-        self._message_exploration.current_message_thread.messages.append(user_message)
+        self._message_exploration.add_message(user_message)
         self.user_message_text = ""
         self.mark_dirty()
 
