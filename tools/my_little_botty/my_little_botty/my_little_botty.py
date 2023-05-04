@@ -1,11 +1,16 @@
 """Welcome to Pynecone! This file outlines the steps to create a basic app."""
 import asyncio
+import atexit
 import json
+import os
 import pprint  # noqa: F401
 import re
+import threading
 import time
 import types
 import typing
+import weakref
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Dict
@@ -14,11 +19,14 @@ import openai
 import pydantic
 import pynecone as pc
 import pynecone.pc as cli
+import watchdog.events
 from pydantic.fields import ModelField
 from pynecone import Var
 from pynecone.components.media.icon import ChakraIconComponent
 from pynecone.utils.imports import ImportDict, merge_imports
 from pynecone.var import BaseVar, ComputedVar
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 
 class TypedVar(Var):
@@ -257,6 +265,23 @@ class AutoFocusTextArea(pc.TextArea):
 auto_focus_text_area = AutoFocusTextArea.create
 
 
+class UID:
+    _last_time_idx: tuple[str, int] | None = None
+
+    @staticmethod
+    def create() -> str:
+        now_dt = datetime.now()
+        # format is YYYYMMDDHHMMSS
+        now_str = now_dt.strftime("%Y%m%d%H%M%S")
+        # if we have the same time as last time, increment the counter
+        if UID._last_time_idx is not None and UID._last_time_idx[0] == now_str:
+            UID._last_time_idx = (now_str, UID._last_time_idx[1] + 1)
+        else:
+            UID._last_time_idx = (now_str, 0)
+
+        return f"{now_str}#{UID._last_time_idx[1]:04d}"
+
+
 # solarized colors as HTML hex
 # https://ethanschoonover.com/solarized/
 class SolarizedColors(str, Enum):
@@ -326,14 +351,14 @@ class MessageSource(pc.Base):
             messages=openai_messages,
             model=model_map[self.model_type],
             stream=True,
-            request_timeout=20,
+            request_timeout=60,
             **self.model_dict,
         )
         return response
 
 
 class Message(pc.Base):
-    uid: str
+    uid: str = pydantic.Field(default_factory=UID.create)
 
     role: MessageRole
     source: MessageSource
@@ -444,7 +469,7 @@ class StyledMessage(Message):
 
 
 class MessageThread(pc.Base):
-    uid: str
+    uid: str = pydantic.Field(default_factory=UID.create)
     messages: list[Message] = pydantic.Field(default_factory=list)
 
     def get_message_by_uid(self, uid: str) -> Message | None:
@@ -483,14 +508,14 @@ class ModelOptions(pc.Base):
 
 
 class MessageExploration(pc.Base):
-    uid: str
-    title: str = "Untitled"
+    uid: str = pydantic.Field(default_factory=UID.create)
+    title: str = ""
     note: str = ""
     tags: list[str] = pydantic.Field(default_factory=list)
 
     current_message_thread_uid: str
     message_threads: list[MessageThread]
-    hidden_message_thread_uids: set[str] = pydantic.Field(default_factory=set)
+    # hidden_message_thread_uids: set[str] = pydantic.Field(default_factory=set)
 
     _message_uid_map: dict[str, Message] = pydantic.PrivateAttr(default_factory=dict)
 
@@ -499,9 +524,12 @@ class MessageExploration(pc.Base):
         return self._message_uid_map
 
     def __init__(self, **data):
-        assert 'message_threads' in data and len(data['message_threads']) > 0
+        if 'message_threads' not in data or len(data['message_threads']) == 0:
+            data['message_threads'] = [MessageThread()]
+
         if 'current_message_thread_uid' not in data:
             data['current_message_thread_uid'] = data['message_threads'][0].uid
+
         super().__init__(**data)
         self._message_uid_map = self._compute_message_uid_map()
 
@@ -542,19 +570,19 @@ class MessageExploration(pc.Base):
         elif len(self.message_threads) > 0:
             self.current_message_thread_uid = self.message_threads[0].uid
         else:
-            self.message_threads = [MessageThread(uid=UID.create())]
+            self.message_threads = [MessageThread()]
             self.current_message_thread_uid = self.message_threads[0].uid
 
-        self.hidden_message_thread_uids.discard(message_thread_uid)
+        # self.hidden_message_thread_uids.discard(message_thread_uid)
 
         # update the message uid map
         self._message_uid_map = self._compute_message_uid_map()
 
-    def set_message_thread_visible(self, message_thread_uid: str, visible: bool):
-        if visible:
-            self.hidden_message_thread_uids.discard(message_thread_uid)
-        else:
-            self.hidden_message_thread_uids.add(message_thread_uid)
+    # def set_message_thread_visible(self, message_thread_uid: str, visible: bool):
+    #     if visible:
+    #         self.hidden_message_thread_uids.discard(message_thread_uid)
+    #     else:
+    #         self.hidden_message_thread_uids.add(message_thread_uid)
 
     def _grid_deduplicate_message_threads(self, message_threads, row):
         cleaned_message_threads = []
@@ -1216,37 +1244,127 @@ def render_message(message: StyledMessage):
     )
 
 
-def render_message_thread_menu(message_thread: MessageThread):
-    return pc.popover(
-        pc.popover_trigger(pc.button(pc.icon(tag="hamburger"), size='xs', variant='ghost')),
-        pc.popover_content(
-            pc.popover_arrow(),
-            pc.popover_body(
-                pc.hstack(
-                    pc.button(pc.icon(tag="close"), size='xs', variant='ghost'),
-                    pc.button(pc.icon(tag="info_outline"), size='xs', variant='ghost'),
-                    pc.button(pc.icon(tag="copy"), size='xs', variant='ghost'),
-                    pc.button(pc.icon(tag="delete"), size='xs', variant='ghost'),
-                    pc.divider(orientation="vertical", height="1em"),
-                    pc.button(pc.icon(tag="lock"), size='xs', variant='ghost'),
-                    pc.button(pc.icon(tag="edit"), size='xs', variant='ghost'),
-                )
+#
+# def render_message_thread_menu(message_thread: MessageThread):
+#     return
+#         pc.popover(
+#         pc.popover_trigger(pc.button(pc.icon(tag="hamburger"), size='xs', variant='ghost')),
+#         pc.popover_content(
+#             pc.popover_arrow(),
+#             pc.popover_body(
+#                 pc.hstack(
+#                     pc.button(react_icon(as_="MdViewSidebar"), size='xs', variant='ghost'),
+#                     pc.button(pc.icon(tag="close"), size='xs', variant='ghost'),
+#                     pc.button(pc.icon(tag="copy"), size='xs', variant='ghost'),
+#                     pc.button(pc.icon(tag="delete"), size='xs', variant='ghost'),
+#                     # pc.divider(orientation="vertical", height="1em"),
+#                     # pc.button(pc.icon(tag="lock"), size='xs', variant='ghost'),
+#                     # pc.button(pc.icon(tag="edit"), size='xs', variant='ghost'),
+#                 )
+#             ),
+#             pc.popover_close_button(),
+#             width='17em',
+#         ),
+#         trigger="hover",
+#     )
+
+
+def render_app_drawer():
+    def render_exploration_buttons(message_exploration: MessageExploration):
+        return pc.hstack(
+            pc.button(
+                pc.cond(
+                    message_exploration.title != "",
+                    pc.text(message_exploration.title),
+                    pc.text("Untitled", as_="i", color=SolarizedColors.base1),
+                ),
+                width="100%",
+                variant=pc.cond(message_exploration.uid == State.message_exploration_uid, "solid", "outline"),
+                on_click=State.select_message_exploration(message_exploration.uid),  # type: ignore
             ),
-            pc.popover_close_button(),
-            width='17em',
+            pc.button(
+                pc.icon(tag="delete"),
+                size='xs',
+                variant='ghost',
+                on_click=RemoveExplorationModalState.ask_to_remove(message_exploration.uid),  # type: ignore
+            ),
+        )
+
+    return pc.drawer(
+        pc.drawer_overlay(
+            pc.drawer_content(
+                pc.drawer_header(
+                    pc.hstack(
+                        pc.text("ChatPlayground"),
+                        pc.spacer(),
+                        pc.button(
+                            pc.icon(tag="close"),
+                            on_click=State.set_drawer_visible(False),
+                            float="right",
+                            size='xs',
+                            variant='ghost',
+                        ),
+                    )
+                ),
+                pc.drawer_body(
+                    pc.divider(margin="0.5em"),
+                    pc.vstack(
+                        pc.foreach(State.get_available_message_explorations, render_exploration_buttons),
+                        spacing="0.5em",
+                        overflow="auto",
+                        height="100%",
+                        display="block",
+                    ),
+                ),
+                pc.modal(
+                    pc.modal_overlay(
+                        pc.modal_content(
+                            pc.modal_header("Confirm"),
+                            pc.modal_body(
+                                "Do you want to delete '"
+                                + RemoveExplorationModalState.remove_modal_exploration_title
+                                + "'?"
+                            ),
+                            pc.modal_footer(
+                                pc.button(
+                                    "Yes",
+                                    on_click=RemoveExplorationModalState.do_remove,
+                                    color_scheme="red",
+                                    margin="0.5em",
+                                ),
+                                pc.button(
+                                    "No",
+                                    on_click=RemoveExplorationModalState.cancel,
+                                    auto_focus=True,
+                                    variant="ghost",
+                                ),
+                            ),
+                        )
+                    ),
+                    is_open=RemoveExplorationModalState.show_modal,
+                ),
+                # pc.drawer_footer(
+                #
+                # ),
+                # bg="rgba(0, 0, 0, 0.3)",
+            )
         ),
-        trigger="hover",
+        is_open=State.drawer_visible,
+        close_on_overlay_click=True,
+        placement="left",
+        auto_focus=True,
+        close_on_esc=True,
     )
 
 
 def render_note_editor():
     return pc.cond(
-        ~MessageExplorationState.note_editor,
+        ~State.note_editor,
         pc.button(
             pc.flex(
                 pc.cond(
-                    MessageExplorationState.note,
-                    render_markdown(MessageExplorationState.note),
+                    State.note,
+                    render_markdown(State.note),
                     pc.markdown("Add a note here...", color=SolarizedColors.base1),
                 ),
                 pc.spacer(),
@@ -1254,7 +1372,7 @@ def render_note_editor():
                 width="100%",
                 style={"font-weight": "normal"},
             ),
-            on_click=MessageExplorationState.start_note_editing(None),
+            on_click=State.start_note_editing(None),
             variant="ghost",
             width="100%",
             padding="0.25em",
@@ -1263,9 +1381,9 @@ def render_note_editor():
             pc.editable_preview(),
             pc.editable_textarea(),
             start_with_edit_view=True,
-            default_value=MessageExplorationState.note,
-            on_submit=MessageExplorationState.update_note,
-            on_cancel=MessageExplorationState.cancel_note_editing,
+            default_value=State.note,
+            on_submit=State.update_note,
+            on_cancel=State.cancel_note_editing,
             margin="0.25em",
         ),
     )
@@ -1400,11 +1518,19 @@ def render_message_exploration(message_thread: MessageThread):
     return pc.box(
         pc.hstack(
             pc.fragment(
-                render_message_thread_menu(message_thread),
+                pc.button(
+                    react_icon(as_="RiSideBarFill"),
+                    size='xs',
+                    variant=pc.cond(State.drawer_visible, 'solid', 'ghost'),
+                    on_click=State.set_drawer_visible(~State.drawer_visible),
+                ),
+                pc.button(
+                    react_icon(as_="RiChatNewLine"), variant="ghost", size="xs", on_click=State.new_message_exploration
+                ),
                 pc.button(
                     react_icon(as_="BsFillGrid3X3GapFill"),
                     size='xs',
-                    variant='ghost',
+                    variant=pc.cond(MessageGridState.is_grid_visible, 'solid', 'ghost'),
                     on_click=MessageGridState.toggle_grid,
                 ),
             ),
@@ -1412,8 +1538,10 @@ def render_message_exploration(message_thread: MessageThread):
                 pc.editable(
                     pc.editable_preview(),
                     pc.editable_input(),
-                    default_value=MessageExplorationState.title,
+                    value=State.title_text,
                     placeholder="Untitled",
+                    on_change=State.set_title_text,
+                    on_submit=State.update_title,
                 ),
                 size="md",
             ),
@@ -1455,23 +1583,6 @@ def render_message_exploration(message_thread: MessageThread):
         ),
         width="100%",
     )
-
-
-class UID:
-    _last_time_idx: tuple[str, int] | None = None
-
-    @staticmethod
-    def create() -> str:
-        now_dt = datetime.now()
-        # format is YYYYMMDDHHMMSS
-        now_str = now_dt.strftime("%Y%m%d%H%M%S")
-        # if we have the same time as last time, increment the counter
-        if UID._last_time_idx is not None and UID._last_time_idx[0] == now_str:
-            UID._last_time_idx = (now_str, UID._last_time_idx[1] + 1)
-        else:
-            UID._last_time_idx = (now_str, 0)
-
-        return f"{now_str}#{UID._last_time_idx[1]:04d}"
 
 
 example_message_thread = MessageThread(
@@ -1612,23 +1723,311 @@ example_message_exploration = MessageExploration(
 )
 
 
+@dataclass
+class MessageExplorationStorage:
+    message_exploration: MessageExploration
+    last_updated: float
+
+
+class MessageExplorationsSingleton(FileSystemEventHandler):
+    """
+    Singleton class that manages all message explorations in the file system.
+
+    This class is responsible for:
+    - loading all message explorations from the file system
+    - saving all message explorations to the file system
+    - sending update events to all registered states
+    """
+
+    DIRECTORY: str = "./message_threads"
+    observer: Observer = Observer()
+    _stored_explorations: dict[str, MessageExplorationStorage] = {}
+
+    _receivers: weakref.WeakValueDictionary[str, pc.State] = weakref.WeakValueDictionary()
+
+    lock: threading.Lock = threading.Lock()
+
+    def __init__(self):
+        self.run()
+        self.load_all()
+
+    def register_state(self, state: pc.State):
+        main_state: pc.State = state.parent_state if state.parent_state else state
+        # TODO: check that we have exactly one state per session id?
+        if main_state.get_sid() not in self._receivers:
+            self._receivers[main_state.get_sid()] = main_state
+
+    def send_update_event(self, origin: pc.State | None, message_exploration_uid: str):
+        if origin is not None:
+            origin = origin.parent_state if origin.parent_state else origin
+
+        # send an event
+        for state in self._receivers.values():
+            if state.get_sid() != origin.get_sid():
+                # noinspection PyNoneFunctionAssignment,PyArgumentList
+                event_handler: pc.event.EventHandler = State.on_message_exploration_update(  # type: ignore
+                    message_exploration_uid  # type: ignore
+                )
+                app.sio.start_background_task(send_event, state, event_handler)
+
+    def get(self, state: pc.State, uid: str):
+        self.register_state(state)
+        for exploration_storage in self._stored_explorations.values():
+            if (exploration := exploration_storage.message_exploration).uid == uid:
+                return exploration.copy(deep=True)
+        raise KeyError(f"MessageExploration with uid {uid} not found")
+
+    def get_all(self, state: pc.State) -> list[MessageExploration]:
+        self.register_state(state)
+
+        # deep copy all
+        return [
+            stored_exploration.message_exploration.copy(deep=True)
+            for stored_exploration in self._stored_explorations.values()
+        ]
+
+    @staticmethod
+    def to_json(message_exploration: MessageExploration):
+        return pydantic.BaseModel.json(message_exploration, indent=1)
+
+    def remove(self, state: pc.State, message_exploration_uid: str):
+        # find the file name in the _explorations (by uid)
+        # then remove the file
+        for filename, stored in self._stored_explorations.items():
+            if stored.message_exploration.uid == message_exploration_uid:
+                path = os.path.join(self.DIRECTORY, filename)
+                # check that path exists as is not below the directory
+                if not os.path.exists(path) or not os.path.samefile(
+                    self.DIRECTORY, os.path.commonpath([path, self.DIRECTORY])
+                ):
+                    raise ValueError(f"Invalid path {path}")
+                os.remove(path)
+                # remove from the dict, too
+                del self._stored_explorations[filename]
+
+                self.send_update_event(state, message_exploration_uid)
+                break
+        else:
+            raise KeyError(f"MessageExploration with uid {message_exploration_uid} not found")
+
+    @staticmethod
+    def convert_title_to_filename_part(title: str):
+        # remove characters that are not valid in file names
+        title = re.sub(r"[^a-zA-Z0-9_ ]", "", title)
+        # replace spaces with single underscores and underscores with double underscores
+        title = re.sub(r"_+", "__", title)
+        title = re.sub(r" +", "_", title)
+        return title.replace(" ", "_").lower()
+
+    @staticmethod
+    def get_canonical_prefix_and_filename(message_exploration: MessageExploration):
+        if message_exploration.title:
+            prefix = MessageExplorationsSingleton.convert_title_to_filename_part(message_exploration.title)
+            filename = f"{prefix}_{time.time()}.json"
+        else:
+            prefix = message_exploration.uid
+            filename = f"{prefix}.json"
+
+        return prefix, filename
+
+    def update(self, state: pc.State, message_exploration: MessageExploration):
+        with self.lock:
+            self.register_state(state)
+
+            # find the file name in the _explorations (by uid)
+            # then update the dict and then write the file
+            for filename, storage in self._stored_explorations.items():
+                if (stored_exploration := storage.message_exploration).uid == message_exploration.uid:
+                    # check if anything changed
+                    if stored_exploration != message_exploration:
+                        # get a temporary file name based on the original file name and the current time
+                        temp_filename = f"{filename}.{time.time()}.tmp"
+                        temp_path = os.path.join(self.DIRECTORY, temp_filename)
+                        with open(temp_path, 'wt') as f:
+                            f.write(self.to_json(message_exploration))
+                            # make sure that all data is on disk
+                            # see http://stackoverflow.com/questions/7433057/is-rename-without-fsync-safe
+                            f.flush()
+                            os.fsync(f.fileno())
+
+                        target_path = os.path.join(self.DIRECTORY, filename)
+                        os.replace(temp_path, target_path)
+
+                        # do we want to rename the file?
+                        canonical_prefix, canonical_filename = self.get_canonical_prefix_and_filename(
+                            message_exploration
+                        )
+                        if not filename.startswith(canonical_prefix):
+                            # rename the file
+                            new_path = os.path.join(self.DIRECTORY, canonical_filename)
+                            os.rename(target_path, new_path)
+
+                            del self._stored_explorations[filename]
+                            filename = canonical_filename
+
+                        # update the dict
+                        self._stored_explorations[filename] = MessageExplorationStorage(
+                            message_exploration=message_exploration.copy(deep=True), last_updated=time.time()
+                        )
+
+                        self.send_update_event(state, message_exploration.uid)
+
+                        return True
+                    break
+            else:
+                # Otherwise, create a new file
+                _, filename = self.get_canonical_prefix_and_filename(message_exploration)
+                path = os.path.join(self.DIRECTORY, filename)
+                with open(path, 'wt') as f:
+                    f.write(pydantic.BaseModel.json(message_exploration, indent=1))
+                    f.flush()
+                    os.fsync(f.fileno())
+                self._stored_explorations[filename] = MessageExplorationStorage(
+                    message_exploration=message_exploration.copy(deep=True), last_updated=time.time()
+                )
+            return False
+
+    def run(self):
+        # create directory if it does not exist
+        if not os.path.exists(self.DIRECTORY):
+            os.makedirs(self.DIRECTORY, exist_ok=True)
+
+        self.observer.schedule(self, self.DIRECTORY, recursive=True)
+        self.observer.start()
+        # call stop() when we exit the program
+        atexit.register(self.observer.stop)
+
+    def reload(self, path):
+        # get the canoncial path relative to the directory
+        filename = os.path.relpath(path, self.DIRECTORY)
+        # does the file name end with .json?
+        if filename.endswith(".json"):
+            full_path = os.path.join(self.DIRECTORY, filename)
+            # check whether it is different (and newer) than the one in the dict
+            # get the last modified time for the file
+            last_modified = os.path.getmtime(full_path)
+            storage_entry = self._stored_explorations.get(filename, None)
+            if storage_entry is not None and storage_entry.last_updated > last_modified:
+                # file is older than the one in the dict
+                return
+
+            # load the file
+            with open(full_path, "rt") as f:
+                try:
+                    message_exploration = MessageExploration.parse_raw(f.read())
+                except pydantic.ValidationError as e:
+                    print(f"Error loading file {full_path}: {e}")
+                else:
+                    if storage_entry is None or message_exploration != storage_entry.message_exploration:
+                        # update the dict
+                        self._stored_explorations[filename] = MessageExplorationStorage(
+                            message_exploration=message_exploration, last_updated=last_modified
+                        )
+                        # send an event
+                        self.send_update_event(None, message_exploration.uid)
+
+    def load_all(self):
+        with self.lock:
+            # list all files in the directory
+            for filename in os.listdir(self.DIRECTORY):
+                # does the file name end with .json?
+                if filename.endswith(".json"):
+                    # load the file
+                    full_path = os.path.join(self.DIRECTORY, filename)
+                    with open(full_path, "rt") as f:
+                        try:
+                            message_exploration = MessageExploration.parse_raw(f.read())
+
+                            last_modified = os.path.getmtime(full_path)
+
+                            self._stored_explorations[filename] = MessageExplorationStorage(
+                                message_exploration=message_exploration, last_updated=last_modified
+                            )
+                        except pydantic.ValidationError as e:
+                            print(f"Error loading file {full_path}: {e}")
+
+    def on_moved(self, event):
+        if isinstance(event, watchdog.events.FileMovedEvent):
+            # convert both paths to relative paths
+            src_path = os.path.relpath(event.src_path, self.DIRECTORY)
+            dest_path = os.path.relpath(event.dest_path, self.DIRECTORY)
+
+            with self.lock:
+                if src_path in self._stored_explorations:
+                    message_exploration = self._stored_explorations[src_path]
+                    del self._stored_explorations[src_path]
+                    self._stored_explorations[dest_path] = message_exploration
+                    self.reload(event.dest_path)
+
+    def on_created(self, event):
+        if isinstance(event, watchdog.events.FileCreatedEvent):
+            with self.lock:
+                self.reload(event.src_path)
+
+    def on_deleted(self, event):
+        if isinstance(event, watchdog.events.FileDeletedEvent):
+            # convert both paths to relative paths
+            src_path = os.path.relpath(event.src_path, self.DIRECTORY)
+
+            with self.lock:
+                if src_path in self._stored_explorations:
+                    del self._stored_explorations[src_path]
+
+    def on_modified(self, event):
+        if isinstance(event, watchdog.events.FileModifiedEvent):
+            # check that the file still exists
+            with self.lock:
+                if os.path.exists(event.src_path):
+                    self.reload(event.src_path)
+
+
+# type: ignore
+# noinspection PyDunderSlots
 class State(pc.State):
     """The app state."""
 
-    _message_exploration: MessageExploration = example_message_exploration.copy(deep=True)
-    auto_focus_uid: str | None = None
+    __slots__ = [
+        '__weakref__',
+        'message_exploration',
+        'note_editor',
+        'drawer_visible',
+        'title_text',
+    ]
+
+    message_exploration: MessageExploration = MessageExploration()
+    note_editor: bool = False
+    drawer_visible: bool = False
+
+    title_text: str = ""
+
+    def on_message_exploration_update(self, message_exploration_uid: str):
+        if message_exploration_uid != self.message_exploration.uid:
+            return
+
+        return self.select_message_exploration(self, message_exploration_uid)  # type: ignore
+
+    def new_message_exploration(self):
+        self._set_message_exploration(self, MessageExploration())  # type: ignore
+
+    def select_message_exploration(self, message_exploration_uid: str):
+        message_exploration = message_explorations_singleton.get(self, message_exploration_uid)
+        if message_exploration != self.message_exploration:
+            self._set_message_exploration(self, message_exploration)  # type: ignore
+
+    def _update_message_exploration_registry(self):
+        message_explorations_singleton.update(self, self.message_exploration)
 
     @property
     def message_map(self):
-        return self._message_exploration.message_uid_map
+        return self.message_exploration.message_uid_map
 
     @pc.var
     def styled_message_thread(self) -> StyledMessageThread:
-        return self._message_exploration.get_styled_current_message_thread()
+        return self.message_exploration.get_styled_current_message_thread()
 
-
-class MessageExplorationState(State):
-    note_editor: bool = False
+    @pc.var
+    def message_exploration_uid(self):
+        return self.message_exploration.uid
 
     def cancel_note_editing(self, _: typing.Any):
         self.note_editor = False
@@ -1640,26 +2039,84 @@ class MessageExplorationState(State):
 
     @pc.var
     def note(self) -> str:
-        return self._message_exploration.note
-
-    @pc.var
-    def title(self) -> str:
-        return self._message_exploration.title
+        return self.message_exploration.note
 
     def update_note(self, content):
-        self._message_exploration.note = content
+        self.message_exploration.note = content
+        self._update_message_exploration_registry(self)  # type: ignore
         self.note_editor = False
         self.mark_dirty()
 
     def update_title(self, content):
-        self._message_exploration.title = content
+        self.message_exploration.title = content
+        self._update_message_exploration_registry(self)  # type: ignore
+        self.mark_dirty()
+
+    @pc.var
+    def get_available_message_explorations(self) -> list[MessageExploration]:
+        return message_explorations_singleton.get_all(self)
+
+    def remove_message_exploration(self, message_exploration_uid: str):
+        if message_exploration_uid == self.message_exploration.uid:
+            # Handle new message exploration differently?
+            self._set_message_exploration(self, MessageExploration())  # type: ignore
+        message_explorations_singleton.remove(self, message_exploration_uid)
+        self.mark_dirty()
+
+    def _set_message_exploration(self, message_exploration: MessageExploration):
+        """
+        Set the current message exploration in the main State.
+
+        :param message_exploration: The message exploration to set
+
+        This mainly ensures that the title and note fields are set correctly.
+        """
+        if message_exploration != self.message_exploration:
+            self.message_exploration = message_exploration
+            self.title_text = message_exploration.title
+            self.drawer_visible = False
+            self.mark_dirty()
+
+
+class RemoveExplorationModalState(State):
+    show_modal: bool = False
+    remove_message_exploration_uid: str | None = None
+
+    @pc.var
+    def remove_modal_exploration_title(self) -> str:
+        if self.remove_message_exploration_uid is not None:
+            return message_explorations_singleton.get(self, self.remove_message_exploration_uid).title
+        return ""
+
+    def ask_to_remove(self, message_exploration_uid: str):
+        self.remove_message_exploration_uid = message_exploration_uid
+        self.show_modal = True
+        self.mark_dirty()
+
+    def do_remove(self):
+        if self.remove_message_exploration_uid is not None:
+            self.show_modal = False
+
+            # FIXME: EventHandler.__call__ wraps the event args in a JSON one too many times.
+            next_event_spec: pc.event.EventSpec = State.remove_message_exploration(None)
+            fixed_event_spec = pc.event.EventSpec(
+                handler=next_event_spec.handler,
+                args=((next_event_spec.args[0][0], self.remove_message_exploration_uid),),
+            )
+            self.remove_message_exploration_uid = None
+            self.mark_dirty()
+            return fixed_event_spec
+
+    def cancel(self):
+        self.show_modal = False
+        self.remove_message_exploration_uid = None
         self.mark_dirty()
 
 
 class NavigationState(State):
     def go_to(self, thread_id, message_uid):
-        self.auto_focus_uid = message_uid
-        self._message_exploration.current_message_thread_uid = thread_id
+        self.message_exploration.current_message_thread_uid = thread_id
+        self._update_message_exploration_registry(self)
         self.mark_dirty()
 
 
@@ -1732,7 +2189,7 @@ class EditableMessageState(State):
             return
 
         # copy the current message thread
-        message_thread = self._message_exploration.current_message_thread.copy()
+        message_thread = self.message_exploration.current_message_thread.copy()
         message_thread.uid = UID.create()
 
         # update the message in the message thread
@@ -1748,7 +2205,8 @@ class EditableMessageState(State):
         message_thread.messages = messages
 
         # update the message exploration
-        self._message_exploration.update_message_thread(message_thread)
+        self.message_exploration.update_message_thread(message_thread)
+        self._update_message_exploration_registry(self)
 
     def _fork_thread(self):
         original_message = self.message_map[self._editable_message.uid]
@@ -1756,7 +2214,7 @@ class EditableMessageState(State):
             return
 
         # copy the current message thread
-        message_thread = self._message_exploration.current_message_thread.copy()
+        message_thread = self.message_exploration.current_message_thread.copy()
         message_thread.uid = UID.create()
 
         # update the message in the message thread
@@ -1777,7 +2235,8 @@ class EditableMessageState(State):
         message_thread.messages = messages
 
         # update the message exploration
-        self._message_exploration.update_message_thread(message_thread)
+        self.message_exploration.update_message_thread(message_thread)
+        self._update_message_exploration_registry(self)
 
 
 class MessageOverviewState(State):
@@ -1799,7 +2258,8 @@ class MessageOverviewState(State):
         if len(linked_message) != 0:
             linked_message = linked_message[0]
             # set the current message thread to the thread of the linked message
-            self._message_exploration.current_message_thread_uid = linked_message.thread_uid
+            self.message_exploration.current_message_thread_uid = linked_message.thread_uid
+            self._update_message_exploration_registry(self)  # type: ignore
 
         self.current_message_uid = None
         self.mark_dirty()
@@ -1845,7 +2305,8 @@ class MessageGridState(State):
     #     return
 
     def remove_thread(self, thread_uid: str):
-        self._message_exploration.delete_message_thread(thread_uid)
+        self.message_exploration.delete_message_thread(thread_uid)
+        self._update_message_exploration_registry(self)  # type: ignore
         self.mark_dirty()
 
     def toggle_grid(self):
@@ -1856,7 +2317,8 @@ class MessageGridState(State):
         self.mark_dirty()
 
     def go_to_thread(self, thread_uid: str):
-        self._message_exploration.current_message_thread_uid = thread_uid
+        self.message_exploration.current_message_thread_uid = thread_uid
+        self._update_message_exploration_registry(self)  # type: ignore
         self._show_grid = False
         self.mark_dirty()
 
@@ -1868,14 +2330,14 @@ class MessageGridState(State):
     def column_thread_uids(self) -> list[str]:
         if not self._show_grid:
             return []
-        return self._message_exploration.get_message_grid().thread_uids
+        return self.message_exploration.get_message_grid().thread_uids
 
     @pc.var
     def styled_grid_cells(self) -> list[list[StyledGridCell]]:
         if not self._show_grid:
             return [[]]
 
-        grid = self._message_exploration.get_message_grid()
+        grid = self.message_exploration.get_message_grid()
 
         styled_grid_cells = []
         for row_idx, messages in enumerate(grid.message_grid):
@@ -1946,7 +2408,7 @@ class ModelRequestsState(State):
 
     @pc.var
     def chat_mode(self) -> bool:
-        messages = self._message_exploration.current_message_thread.messages
+        messages = self.message_exploration.current_message_thread.messages
         if len(messages) == 0 or messages[-1].role != MessageRole.HUMAN:
             return True
         return False
@@ -1956,6 +2418,7 @@ class ModelRequestsState(State):
             return
         self._active_message.error = "Canceled by user."
         self._active_message = None
+        self._update_message_exploration_registry(self)
         self.mark_dirty()
 
     def receive_partial_response(self, payload_str: str):
@@ -1971,6 +2434,7 @@ class ModelRequestsState(State):
             assert isinstance(payload['content'], str)
             assert self._active_message.content is not None
             self._active_message.content += payload['content']
+            self._update_message_exploration_registry(self)  # type: ignore
         self.mark_dirty()
 
     def receive_error(self, payload_str: str):
@@ -1982,6 +2446,7 @@ class ModelRequestsState(State):
 
         self._active_message.error = payload['content']
         self._active_message = None
+        self._update_message_exploration_registry(self)  # type: ignore
         self.mark_dirty()
 
     def _request_chat_model_completion(self):
@@ -2003,10 +2468,11 @@ class ModelRequestsState(State):
         )
 
         self._active_message = active_message
-        self._message_exploration.add_message(active_message)
+        self.message_exploration.add_message(active_message)
+        self._update_message_exploration_registry(self)
 
         openai_messages = [
-            message.get_ai_prompt() for message in self._message_exploration.current_message_thread.messages
+            message.get_ai_prompt() for message in self.message_exploration.current_message_thread.messages
         ]
 
         async def _query_openai():
@@ -2028,8 +2494,8 @@ class ModelRequestsState(State):
                     if 'content' in delta:
                         content = delta['content']
                         # noinspection PyNoneFunctionAssignment,PyArgumentList
-                        event_handler: pc.event.EventHandler = (
-                            ModelRequestsState.receive_partial_response(  # type: ignore
+                        event_handler: pc.event.EventHandler = (  # type: ignore
+                            ModelRequestsState.receive_partial_response(
                                 PartialResponsePayload(
                                     uid=active_message.uid,
                                     content=content,
@@ -2082,7 +2548,9 @@ class ModelRequestsState(State):
                 model_type=None,
             ),
         )
-        self._message_exploration.add_message(user_message)
+        self.message_exploration.add_message(user_message)
+        self._update_message_exploration_registry(self)
+
         self.user_message_text = ""
         self.mark_dirty()
 
@@ -2095,11 +2563,14 @@ def index() -> pc.Component:
             render_message_exploration(State.styled_message_thread),
             width="100",
         ),
+        render_app_drawer(),
         padding_top="64px",
         padding_bottom="64px",
         max_width="80ch",
     )
 
+
+message_explorations_singleton = MessageExplorationsSingleton()
 
 # Add state and page to the app.
 app = pc.App(
