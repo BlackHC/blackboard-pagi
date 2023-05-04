@@ -831,6 +831,7 @@ def render_grid_cell(styled_grid_cell: StyledGridCell):
                                     border_color=message.foreground_color,
                                     width="100%",
                                     padding="0 0.25em 0 0.25em",
+                                    style={"z-index": 2},
                                 ),
                             ),
                             pc.box(
@@ -852,6 +853,7 @@ def render_grid_cell(styled_grid_cell: StyledGridCell):
                                 border_color=message.foreground_color,
                                 width="100%",
                                 padding="0 0.25em 0 0.25em",
+                                style={"z-index": 2},
                             ),
                         ),
                     ),
@@ -904,6 +906,7 @@ def render_grid_column_button(thread_uid: str, index):
             row_span=MessageGridState.styled_grid_cells.length(),
             col_start=index.to(int) + 1,
             col_span=1,
+            style={"z-index": 1},
         ),
     )
 
@@ -1385,10 +1388,6 @@ def render_request_ui():
             ),
         ),
         pc.fragment(
-            pc.cond(
-                ModelRequestsState.styled_active_message,
-                render_active_message(ModelRequestsState.styled_active_message),
-            ),
             pc.button(
                 pc.spinner(color="blue", size="xs"),
                 pc.text("Cancel", margin_left="1em", on_click=ModelRequestsState.cancel_active_chat_completion),
@@ -1429,7 +1428,11 @@ def render_message_exploration(message_thread: MessageThread):
             MessageGridState.is_grid_visible,
             render_message_grid(),
             pc.box(
-                pc.foreach(message_thread.messages, render_message),
+                pc.cond(
+                    ModelRequestsState.active_generation,
+                    pc.foreach(message_thread.messages, render_active_message),
+                    pc.foreach(message_thread.messages, render_message),
+                ),
                 render_request_ui(),
                 pc.box(
                     pc.accordion(
@@ -1833,49 +1836,56 @@ class MessageOverviewState(State):
 
 
 class MessageGridState(State):
-    _grid: MessageGrid | None = None
+    _show_grid: bool = False
+
+    # @property
+    # def _grid(self) -> MessageGrid | None:
+    #     if not self._show_grid:
+    #         return None
+    #     return
 
     def remove_thread(self, thread_uid: str):
         self._message_exploration.delete_message_thread(thread_uid)
-        self._grid = self._message_exploration.get_message_grid()
         self.mark_dirty()
 
     def toggle_grid(self):
-        if self._grid is None:
-            self._grid = self._message_exploration.get_message_grid()
+        if not self._show_grid:
+            self._show_grid = True
         else:
-            self._grid = None
+            self._show_grid = False
         self.mark_dirty()
 
     def go_to_thread(self, thread_uid: str):
         self._message_exploration.current_message_thread_uid = thread_uid
-        self._grid = None
+        self._show_grid = False
         self.mark_dirty()
 
     @pc.var
     def is_grid_visible(self) -> bool:
-        return self._grid is not None
+        return self._show_grid
 
     @pc.var
     def column_thread_uids(self) -> list[str]:
-        if self._grid is None:
+        if not self._show_grid:
             return []
-        return self._grid.thread_uids
+        return self._message_exploration.get_message_grid().thread_uids
 
     @pc.var
     def styled_grid_cells(self) -> list[list[StyledGridCell]]:
-        if self._grid is None:
+        if not self._show_grid:
             return [[]]
 
+        grid = self._message_exploration.get_message_grid()
+
         styled_grid_cells = []
-        for row_idx, messages in enumerate(self._grid.message_grid):
+        for row_idx, messages in enumerate(grid.message_grid):
             styled_row = []
             for col_idx, message in enumerate(messages):
                 styled_grid_cell = StyledGridCell(
                     message=message.compute_editable_style() if message is not None else None,
                     row_idx=row_idx + 1,
                     col_idx=col_idx + 1,
-                    thread_uid=self._grid.thread_uids[col_idx],
+                    thread_uid=grid.thread_uids[col_idx],
                 )
                 styled_row.append(styled_grid_cell)
             styled_grid_cells.append(styled_row)
@@ -1947,7 +1957,6 @@ class ModelRequestsState(State):
         if self._active_message is None:
             return
         self._active_message.error = "Canceled by user."
-        self._message_exploration.add_message(self._active_message)
         self._active_message = None
         self.mark_dirty()
 
@@ -1959,7 +1968,6 @@ class ModelRequestsState(State):
             return
 
         if payload['content'] is None:
-            self._message_exploration.add_message(self._active_message)
             self._active_message = None
         else:
             assert isinstance(payload['content'], str)
@@ -1975,7 +1983,6 @@ class ModelRequestsState(State):
             return
 
         self._active_message.error = payload['content']
-        self._message_exploration.add_message(self._active_message)
         self._active_message = None
         self.mark_dirty()
 
@@ -1998,6 +2005,7 @@ class ModelRequestsState(State):
         )
 
         self._active_message = active_message
+        self._message_exploration.add_message(active_message)
 
         openai_messages = [
             message.get_ai_prompt() for message in self._message_exploration.current_message_thread.messages
