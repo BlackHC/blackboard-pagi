@@ -221,6 +221,42 @@ class ReactIcon(ChakraIconComponent):
 react_icon = ReactIcon.create
 
 
+# BUG(blackhc): https://github.com/pynecone-io/pynecone/issues/925
+class FixedSlider(pc.Slider):
+    @classmethod
+    def get_controlled_triggers(cls) -> Dict[str, Var]:
+        return {}
+
+    def get_triggers(cls) -> set[str]:
+        return {"on_change_end"}
+
+
+fixed_slider = FixedSlider.create
+
+
+def float_slider(value: Var[float], setter, min_: float, max_: float, step: float = 0.01):
+    def on_change_end(final_value: Var[int]):
+        event_spec: pc.event.EventSpec = setter(final_value * step + min_)
+        return event_spec.copy(update=dict(local_args={final_value.name}))
+
+    return pc.fragment(
+        pc.text(BaseVar(name=f"{value.full_name}.toFixed(2)", type_=str)),
+        fixed_slider(
+            min_=0,
+            max_=int((max_ - min_ + step / 2) // step),
+            default_value=((value - min_ + step / 2) // step).to(int),
+            on_change_end=on_change_end(pc.EVENT_ARG),
+        ),
+    )
+
+
+class AutoFocusTextArea(pc.TextArea):
+    auto_focus: Var[typing.Union[str, int, bool]]
+
+
+auto_focus_text_area = AutoFocusTextArea.create
+
+
 # solarized colors as HTML hex
 # https://ethanschoonover.com/solarized/
 class SolarizedColors(str, Enum):
@@ -1132,13 +1168,6 @@ def render_editable_message_error(message):
     )
 
 
-class AutoFocusTextArea(pc.TextArea):
-    auto_focus: Var[typing.Union[str, int, bool]]
-
-
-auto_focus_text_area = AutoFocusTextArea.create
-
-
 def render_editable_message_content(message, with_error: bool):
     return auto_focus_text_area(
         auto_focus=True,
@@ -1238,35 +1267,6 @@ def render_note_editor():
             on_submit=MessageExplorationState.update_note,
             on_cancel=MessageExplorationState.cancel_note_editing,
             margin="0.25em",
-        ),
-    )
-
-
-# BUG(blackhc): https://github.com/pynecone-io/pynecone/issues/925
-class FixedSlider(pc.Slider):
-    @classmethod
-    def get_controlled_triggers(cls) -> Dict[str, Var]:
-        return {}
-
-    def get_triggers(cls) -> set[str]:
-        return {"on_change_end"}
-
-
-fixed_slider = FixedSlider.create
-
-
-def float_slider(value: Var[float], setter, min_: float, max_: float, step: float = 0.01):
-    def on_change_end(final_value: Var[int]):
-        event_spec: pc.event.EventSpec = setter(final_value * step + min_)
-        return event_spec.copy(update=dict(local_args={final_value.name}))
-
-    return pc.fragment(
-        pc.text(BaseVar(name=f"{value.full_name}.toFixed(2)", type_=str)),
-        fixed_slider(
-            min_=0,
-            max_=int((max_ - min_ + step / 2) // step),
-            default_value=((value - min_ + step / 2) // step).to(int),
-            on_change_end=on_change_end(pc.EVENT_ARG),
         ),
     )
 
@@ -1916,11 +1916,9 @@ async def send_event(state: pc.State, event_handler: pc.event.EventHandler):
     await app.sio.emit(str(pc.constants.SocketEvent.EVENT), state_update_json, to=state.get_sid(), namespace="/event")
 
 
-# class PartialResponsePayload(typing.TypedDict):
-#     uid: str
-#     content: str
-
-PartialResponsePayload: typing.TypeAlias = dict[str, str]
+class PartialResponsePayload(typing.TypedDict):
+    uid: str
+    content: str
 
 
 class ModelRequestsState(State):
