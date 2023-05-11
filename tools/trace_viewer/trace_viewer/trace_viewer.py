@@ -136,11 +136,11 @@ class State(pc.State):
 
     def reset_graph(self):
         self._trace = None
-        self.update_flame_graph(self)  # type: ignore
+        self.update_flame_graph()
 
     def load_default_flame_graph(self):
         self._trace = load_example_trace()
-        self.update_flame_graph(self)  # type: ignore
+        self.update_flame_graph()
 
     async def handle_trace_upload(self, file: pc.UploadFile):
         """Handle the upload of a file.
@@ -150,7 +150,7 @@ class State(pc.State):
         """
         upload_data = await file.read()
         self._trace = Trace.parse_raw(upload_data)
-        self.update_flame_graph(self)  # type: ignore
+        self.update_flame_graph()
 
     def update_flame_graph(self):
         if self._trace is None:
