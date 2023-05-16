@@ -1,13 +1,11 @@
-import dis
 import inspect
 
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel
 
 from blackboard_pagi.utils.tracer import module_filtering
 
 
-@dataclass
-class FrameInfo:
+class FrameInfo(BaseModel):
     """
     A frame info object that is serializable.
     """
@@ -17,7 +15,7 @@ class FrameInfo:
     function: str
     code_context: list[str] | None
     index: int | None
-    positions: dis.Positions | None = None
+    # positions: dis.Positions | None = None
 
 
 def get_frame_infos(
@@ -46,7 +44,7 @@ def get_frame_infos(
             function=f.function,
             code_context=f.code_context,
             index=f.index,
-            positions=f.positions,
+            # positions=f.positions,
         )
         for f in relevant_inspect_frame_infos
     ]

@@ -12,6 +12,7 @@ from functools import partial, wraps
 from typing import ClassVar
 
 from langchain.schema import BaseMessage
+from trace_viewer.trace_viewer.endpoint_integration import trace_viewer_send_trace_builder
 
 from blackboard_pagi.utils.callable_wrapper import CallableWrapper
 from blackboard_pagi.utils.tracer import module_filtering
@@ -93,14 +94,14 @@ class TraceNodeBuilder:
             name=self.name,
             event_id=self.event_id,
             start_time_ms=self.start_time_ms,
-            end_time_ms=self.end_time_ms,
+            end_time_ms=self.end_time_ms or default_timer(),
             delta_frame_infos=self.delta_frame_infos,
             properties=self.properties,
             children=[sub_event.build() for sub_event in self.children],
         )
 
 
-@dataclass
+@dataclass(weakref_slot=True, slots=True)
 class TraceBuilder:
     _current: ClassVar[ContextVar['TraceBuilder | None']] = ContextVar("current_trace_builder", default=None)
 
@@ -139,6 +140,7 @@ class TraceBuilder:
             with self.event_scope(name=name, kind=TraceNodeKind.SCOPE, skip_frames=2):
                 yield self
         finally:
+            trace_viewer_send_trace_builder(self, force=True)
             self._current.reset(token)
             self.current_event_node = None
 
@@ -186,6 +188,8 @@ class TraceBuilder:
         finally:
             event_node.end_time_ms = default_timer()
             self.current_event_node = old_event_node
+
+            trace_viewer_send_trace_builder(self)
 
     def register_object(self, obj: object, name: str, properties: dict[str, object]):
         # Make name unique if needed

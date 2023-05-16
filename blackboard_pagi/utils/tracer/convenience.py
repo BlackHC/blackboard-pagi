@@ -3,16 +3,22 @@ from contextlib import contextmanager
 from blackboard_pagi.utils.tracer import module_filtering, trace_builder, trace_schema
 
 
-def build_trace(module_filters: module_filtering.ModuleFiltersSpecifier | None = None, stack_frame_context: int = 3):
+def build_trace(
+    module_filters: module_filtering.ModuleFiltersSpecifier | None = None,
+    stack_frame_context: int = 3,
+    name: str | None = None,
+):
     """
     Context manager that allows to trace our program execution.
     """
     if not module_filters:
         module_filters = trace_builder.trace_module_filters
 
-    return trace_builder.TraceBuilder(
+    builder = trace_builder.TraceBuilder(
         module_filters=module_filtering.module_filters(module_filters), stack_frame_context=stack_frame_context
     )
+    builder.event_root.name = name
+    return builder
 
 
 def add_event(

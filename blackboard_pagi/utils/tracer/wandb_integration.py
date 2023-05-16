@@ -73,7 +73,9 @@ def wandb_tracer(
     module_filters: module_filtering.ModuleFiltersSpecifier | None = None,
     stack_frame_context: int = 3,
 ):
-    tb = build_trace(module_filters=module_filters, stack_frame_context=stack_frame_context)  # type: ignore
+    tb = build_trace(
+        module_filters=module_filters, stack_frame_context=stack_frame_context, name=wandb.run.name  # type: ignore
+    )  # type: ignore
     try:
         with tb.scope(name) as builder:
             yield builder
