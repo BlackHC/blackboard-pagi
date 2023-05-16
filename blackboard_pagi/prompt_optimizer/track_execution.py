@@ -202,4 +202,4 @@ def _convert_chat_model(chat_model: BaseChatModel, converter: ObjectConverter) -
 
 @trace_object_converter.register_converter()
 def _convert_tracked_chat_model(chat_model: TrackedChatModel, converter: ObjectConverter) -> dict:
-    return dict(_type=chat_model.chat_model__class__.__name__)
+    return dict(_type=chat_model.chat_model.__class__.__name__)
