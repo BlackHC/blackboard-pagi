@@ -160,16 +160,6 @@ class HyperparameterBuilder:
             return definition.explicit_type
 
     def build(self):
-        # field_definitions = [
-        #     (name, self.get_type(name))
-        #     for name, definition in self.hyperparameter_definitions.items()
-        # ]
-        # namespace = {name: definition.field_info for name, definition in self.hyperparameter_definitions.items()}
-        #
-        # dataclass_type = dataclasses.make_dataclass(self.qualname, field_definitions, namespace=namespace)
-        # model = pydantic.dataclasses.dataclass(dataclass_type)
-        #
-        # return model(**self.hyperparameters)
         field_definitions = {
             name: (self.get_type(name), definition.field_info)
             for name, definition in self.hyperparameter_definitions.items()
