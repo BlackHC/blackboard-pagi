@@ -2,8 +2,6 @@
 Simple logger/execution tracker that uses tracks the stack frames and 'data'.
 """
 import inspect
-import json
-import os
 import time
 import traceback
 import typing
@@ -15,7 +13,6 @@ from typing import ClassVar
 
 from langchain.schema import BaseMessage
 
-from blackboard_pagi.tools.trace_viewer.endpoint_integration import trace_viewer_send_trace_builder
 from blackboard_pagi.utils.callable_wrapper import CallableWrapper
 from blackboard_pagi.utils.tracer import module_filtering
 from blackboard_pagi.utils.tracer.frame_info import FrameInfo, get_frame_infos
@@ -110,30 +107,6 @@ class TraceBuilderEventHandler:
 
     def on_event_scope_final(self, builder: 'TraceBuilder'):
         pass
-
-
-class TraceViewerIntegration(TraceBuilderEventHandler):
-    def on_scope_final(self, builder: 'TraceBuilder'):
-        trace_viewer_send_trace_builder(builder, force=True)
-
-    def on_event_scope_final(self, builder: 'TraceBuilder'):
-        trace_viewer_send_trace_builder(builder, force=False)
-
-
-@dataclass
-class JsonFileWriter(TraceBuilderEventHandler):
-    filename: str
-
-    def on_event_scope_final(self, builder: 'TraceBuilder'):
-        trace = builder.build()
-        json_trace = trace.dict()
-
-        tempfile = self.filename + ".new_tmp"
-
-        with open(tempfile, "w") as f:
-            json.dump(json_trace, f)
-
-        os.replace(tempfile, self.filename)
 
 
 @dataclass(weakref_slot=True, slots=True)

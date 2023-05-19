@@ -1,10 +1,10 @@
 from .convenience import add_event, build_trace, event_scope, register_object, update_event_properties, update_name
+from .handlers.json_writer import JsonFileWriter
+from .handlers.trace_viewer import TraceViewerIntegration
 from .module_filtering import module_filter, module_filters
 from .trace_builder import (
-    JsonFileWriter,
     TraceBuilder,
     TraceBuilderEventHandler,
-    TraceViewerIntegration,
     trace_calls,
     trace_module_filters,
     trace_object_converter,
