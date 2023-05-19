@@ -1,3 +1,6 @@
+import copy
+import os
+from dataclasses import dataclass
 from enum import Enum
 
 import svgwrite
@@ -7,6 +10,7 @@ from svgwrite.etree import etree
 from svgwrite.mixins import Clipping, Presentation, Transform
 
 from blackboard_pagi.utils.tracer import Trace, TraceNode, TraceNodeKind
+from blackboard_pagi.utils.tracer.trace_builder import TraceBuilder, TraceBuilderEventHandler
 
 
 # solarized colors as HTML hex
@@ -237,6 +241,7 @@ var module, window, define, renderjson = (function() {
         pre_text.style.border = "1px solid #ccc";
         // scrollbar-gutter: stable;
         pre_text.style.scrollbarGutter = "stable";
+        pre_text.style.margin = "0";
 
         let as = [
             append(span(null), text(my_indent)),
@@ -516,7 +521,9 @@ def create_svg_from_trace(trace: Trace):
             * 99.5
             * svgwrite.percent,
         )
-        node_group["data-raw"] = node.json(indent=1)
+        node_copy = copy.deepcopy(node)
+        node_copy.children = []
+        node_group["data-raw"] = node_copy.json()
         parent.add(node_group)
 
         rect = dwg.rect(
@@ -576,8 +583,9 @@ def create_svg_from_trace(trace: Trace):
         height=420,
         inner_xml=etree.fromstring(
             """
-<div xmlns="http://www.w3.org/1999/xhtml"
-     style="height: 100%; display: flex; flex-direction: column; background-color: #eee8d5;">
+<html xmlns="http://www.w3.org/1999/xhtml" style="height: 100%;">
+<body style="height: 100%;">
+<div style="height: 100%; display: flex; flex-direction: column; background-color: #eee8d5;">
     <style>
         // Solarized Light Color Scheme (Different Colors for Different Types)
         .renderjson a              { text-decoration: none; }
@@ -665,6 +673,7 @@ def create_svg_from_trace(trace: Trace):
         </table>
     </div>
 </div>
+</body></html>
             """
         ),
     )
@@ -705,6 +714,7 @@ def create_svg_from_trace(trace: Trace):
                 rendered_json.style.wordWrap = "break-word";
                 rendered_json.style.overflow = "auto";
                 rendered_json.style.display = "inline-block";
+                rendered_json.style.margin = "0";
                 node.appendChild(rendered_json);
             }
 
@@ -725,6 +735,11 @@ def create_svg_from_trace(trace: Trace):
             renderjson_to(details_self, self);
 
             // set properties
+            // remove exception, result, arguments, self
+            delete trace_info.properties.exception;
+            delete trace_info.properties.result;
+            delete trace_info.properties.arguments;
+            delete trace_info.properties.self;
             let properties = trace_info.properties || {};
             renderjson_to(details_properties, properties);
         }
@@ -752,11 +767,26 @@ def create_svg_from_trace(trace: Trace):
         )
     )
 
-    dwg.save()
+    return dwg
+
+
+def save_trace_as_svg(filename: str, trace: Trace):
+    tempfile = filename + ".new_tmp"
+    svg = create_svg_from_trace(trace)
+    svg.saveas(tempfile)
+    os.replace(tempfile, filename)
+
+
+@dataclass
+class SvgFileWriter(TraceBuilderEventHandler):
+    filename: str
+
+    def on_scope_final(self, builder: 'TraceBuilder'):
+        save_trace_as_svg(self.filename, builder.build())
 
 
 # main
 if __name__ == "__main__":
     # load example trace data
     trace = Trace.parse_file("spikes/optimization_unit_trace_ada_2023-05-19_11-07-07.json")
-    create_svg_from_trace(trace)
+    save_trace_as_svg("trace.svg", trace)
