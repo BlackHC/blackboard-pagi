@@ -2,6 +2,8 @@
 Simple logger/execution tracker that uses tracks the stack frames and 'data'.
 """
 import inspect
+import json
+import os
 import time
 import traceback
 import typing
@@ -101,6 +103,37 @@ class TraceNodeBuilder:
         )
 
 
+class TraceBuilderEventHandler:
+    def on_scope_final(self, builder: 'TraceBuilder'):
+        pass
+
+    def on_event_scope_final(self, builder: 'TraceBuilder'):
+        pass
+
+
+class TraceViewerIntegration(TraceBuilderEventHandler):
+    def on_scope_final(self, builder: 'TraceBuilder'):
+        trace_viewer_send_trace_builder(self, force=True)
+
+    def on_event_scope_final(self, builder: 'TraceBuilder'):
+        trace_viewer_send_trace_builder(self, force=False)
+
+
+class JsonFileWriter(TraceBuilderEventHandler):
+    filename: str
+
+    def on_event_scope_final(self, builder: 'TraceBuilder'):
+        trace = builder.build()
+        json_trace = trace.dict()
+
+        tempfile = self.filename + ".new_tmp"
+
+        with open(tempfile, "w") as f:
+            json.dump(json_trace, f)
+
+        os.replace(tempfile, self.filename)
+
+
 @dataclass(weakref_slot=True, slots=True)
 class TraceBuilder:
     _current: ClassVar[ContextVar['TraceBuilder | None']] = ContextVar("current_trace_builder", default=None)
@@ -114,6 +147,8 @@ class TraceBuilder:
 
     id_counter: int = 0
     current_event_node: TraceNodeBuilder | None = None
+
+    event_handlers: list[TraceBuilderEventHandler] = field(default_factory=list)
 
     def build(self):
         return Trace(
@@ -140,7 +175,8 @@ class TraceBuilder:
             with self.event_scope(name=name, kind=TraceNodeKind.SCOPE, skip_frames=2):
                 yield self
         finally:
-            trace_viewer_send_trace_builder(self, force=True)
+            for handler in self.event_handlers:
+                handler.on_scope_final(self)
             self._current.reset(token)
             self.current_event_node = None
 
@@ -189,7 +225,8 @@ class TraceBuilder:
             event_node.end_time_ms = default_timer()
             self.current_event_node = old_event_node
 
-            trace_viewer_send_trace_builder(self)
+            for handler in self.event_handlers:
+                handler.on_event_scope_final(self)
 
     def register_object(self, obj: object, name: str, properties: dict[str, object]):
         # Make name unique if needed
