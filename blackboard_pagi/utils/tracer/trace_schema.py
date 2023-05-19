@@ -36,6 +36,7 @@ class TraceNode(BaseModel):
 
     start_time_ms: int
     end_time_ms: int
+    running: bool = False
 
     delta_frame_infos: list[FrameInfo]
 

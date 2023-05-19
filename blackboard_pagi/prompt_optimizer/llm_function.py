@@ -386,9 +386,20 @@ class LLMStructuredPrompt(typing.Generic[B, T]):
     @track_hyperparameters
     def query(self, language_model_or_chat_chain, schema):
         # create the prompt
+        json_dumps_kwargs = Hyperparameter("json_dumps_kwargs") @ dict(indent=0)
+        additional_definitions_prompt_template = Hyperparameter(
+            "additional_definitions_prompt_template",
+            "Here is the schema for additional data types:\n" "```\n" "{additional_definitions}\n" "```\n" "\n",
+        )
+        optional_additional_definitions_prompt = ""
+        if schema['additional_definitions']:
+            optional_additional_definitions_prompt = additional_definitions_prompt_template.format(
+                additional_definitions=json.dumps(schema['additional_definitions'], **json_dumps_kwargs)
+            )
+
         prompt = (
             Hyperparameter(
-                "llm_structured_prompt",
+                "llm_structured_prompt_template",
                 description="The general-purpose prompt for the structured prompt execution. It tells the LLM what to "
                 "do and how to read function arguments and structure return values. ",
             )
@@ -403,11 +414,7 @@ class LLMStructuredPrompt(typing.Generic[B, T]):
                 '"foo": '
                 '["bar", "baz"]}}}} is not well-formatted.\n'
                 "\n"
-                "Here is the schema for additional date types:\n"
-                "```\n"
-                "{additional_definitions}\n"
-                "```\n"
-                "\n"
+                "{optional_additional_definitions_prompt}"
                 "Here is the input schema:\n"
                 "```\n"
                 "{input_schema}\n"
@@ -420,14 +427,14 @@ class LLMStructuredPrompt(typing.Generic[B, T]):
                 "Now output the results for the following inputs:\n"
                 "```\n"
                 "{inputs}\n"
-                "```\n"
+                "```"
             )
         ).format(
             docstring=self.docstring,
-            additional_definitions=json.dumps(schema['additional_definitions'], indent=1),
-            input_schema=json.dumps(schema['input_schema'], indent=1),
-            output_schema=json.dumps(schema['output_schema'], indent=1),
-            inputs=self.input.json(indent=1),
+            optional_additional_definitions_prompt=optional_additional_definitions_prompt,
+            input_schema=json.dumps(schema['input_schema'], **json_dumps_kwargs),
+            output_schema=json.dumps(schema['output_schema'], **json_dumps_kwargs),
+            inputs=self.input.json(**json_dumps_kwargs),
         )
 
         # get the response

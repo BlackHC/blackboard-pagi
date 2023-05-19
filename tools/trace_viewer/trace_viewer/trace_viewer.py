@@ -165,7 +165,7 @@ def convert_trace_to_flame_graph_data(trace: Trace) -> dict:
         duration_s = node.end_time_ms - node.start_time_ms
         return FlameGraphNode(
             id=str(node.event_id),
-            name=node.name,
+            name=node.name if not node.running else f"{node.name} (*)",
             value=duration_s * discount,
             children=children,
             background_color=convert_trace_node_kind_to_color(node.kind),
@@ -212,12 +212,15 @@ class State(pc.State):
         self.update_flame_graph()
         self.mark_dirty()
 
-    async def handle_trace_upload(self, file: pc.UploadFile):
+    async def handle_trace_upload(self, files: list[pc.UploadFile]):
         """Handle the upload of a file.
 
         Args:
             file: The uploaded file.
         """
+        print(f"Received file upload {files}")
+        assert len(files) == 1, "Expected exactly one file"
+        file = files[0]
         upload_data = await file.read()
         self._trace = Trace.parse_raw(upload_data)  # type: ignore
         self.trace_name = None
@@ -325,6 +328,13 @@ def render_node_info(node_info: NodeInfo):
                     ),
                 ),
                 pc.cond(
+                    node_info.result,
+                    pc.tr(
+                        pc.th("Result", style=header_style),
+                        pc.td(json_view(data=node_info.result), colspan=0),
+                    ),
+                ),
+                pc.cond(
                     node_info.arguments,
                     pc.tr(
                         pc.th("Arguments", style=header_style),
@@ -336,13 +346,6 @@ def render_node_info(node_info: NodeInfo):
                     pc.tr(
                         pc.th("Self", style=header_style),
                         pc.td(json_view(data=node_info.self_object), colspan=0),
-                    ),
-                ),
-                pc.cond(
-                    node_info.result,
-                    pc.tr(
-                        pc.th("Result", style=header_style),
-                        pc.td(json_view(data=node_info.result), colspan=0),
                     ),
                 ),
                 pc.cond(
@@ -414,6 +417,12 @@ def index() -> pc.Component:
 streamed_traced_singleton = StreamedTracesSingleton()
 
 
+meta = [
+    {"name": "theme_color", "content": SolarizedColors.green},
+    {"char_set": "UTF-8"},
+    # {"property": "og:url", "content": "url"},
+]
+
 # Add state and page to the app.
 app = pc.App(
     state=State,
@@ -421,7 +430,13 @@ app = pc.App(
         'react-json-view-lite.css',
     ],
 )
-app.add_page(index, on_load=State.register_state)
+app.add_page(
+    index,
+    on_load=State.register_state,
+    meta=meta,
+    title="Trace Viewer",
+    description="View traces (both offline and streamed).",
+)
 
 
 @app.api.post("/trace/{trace_name}", status_code=status.HTTP_204_NO_CONTENT)

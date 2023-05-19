@@ -3,7 +3,9 @@ from contextlib import contextmanager
 import wandb.sdk.wandb_run
 from wandb.sdk.data_types import trace_tree
 
-from blackboard_pagi.utils.tracer import Trace, TraceNode, TraceNodeKind, build_trace, module_filtering  # type: ignore
+from blackboard_pagi.utils.tracer import TraceBuilder  # type: ignore
+from blackboard_pagi.utils.tracer import Trace, TraceNode, TraceNodeKind, build_trace, module_filtering
+from blackboard_pagi.utils.tracer.trace_builder import TraceBuilderEventHandler
 
 
 def convert_event_kind_str(kind: TraceNodeKind):
@@ -66,20 +68,28 @@ def wandb_build_trace_trees(trace: Trace):
     return media_list
 
 
+class WandBIntegration(TraceBuilderEventHandler):
+    def on_scope_final(self, builder: 'TraceBuilder'):
+        for trace_artifact in wandb_build_trace_trees(builder.build()):
+            wandb.log({"trace": trace_artifact})  # type: ignore
+
+
 @contextmanager
 def wandb_tracer(
     name: str | None,
     *,
     module_filters: module_filtering.ModuleFiltersSpecifier | None = None,
     stack_frame_context: int = 3,
+    event_handlers: list[TraceBuilderEventHandler] = [],
 ):
     tb = build_trace(
         module_filters=module_filters, stack_frame_context=stack_frame_context, name=wandb.run.name  # type: ignore
     )  # type: ignore
+    tb.event_handlers.append(WandBIntegration())
+    tb.event_handlers.extend(event_handlers)
+
     try:
         with tb.scope(name) as builder:
             yield builder
     finally:
-        for trace_artifact in wandb_build_trace_trees(builder.build()):
-            wandb.log({"trace": trace_artifact})  # type: ignore
         wandb.finish()  # type: ignore

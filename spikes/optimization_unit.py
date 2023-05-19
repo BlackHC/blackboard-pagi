@@ -5,6 +5,7 @@ import functools
 import traceback
 import typing
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Generic, TypeVar
 
 import langchain
@@ -34,7 +35,7 @@ from blackboard_pagi.prompt_optimizer.track_hyperparameters import (
     track_hyperparameters,
 )
 from blackboard_pagi.prompts.chat_chain import ChatChain
-from blackboard_pagi.utils.tracer import build_trace
+from blackboard_pagi.utils.tracer import JsonFileWriter, TraceViewerIntegration, build_trace
 from blackboard_pagi.utils.tracer.wandb_integration import wandb_tracer
 
 langchain.llm_cache = SQLiteCache(".optimization_unit.langchain.db")
@@ -45,7 +46,7 @@ chat_model = TrackedChatModel(chat_model=chat_model)
 # simpler_chat_model = LLMAsChatModel(llm=simpler_llm)
 # chat_model = ChatOpenAI(max_tokens=512, model_kwargs=dict(temperature=0.5))
 simpler_chat_model = ChatOpenAI(
-    model_name="gpt-3.5-turbo-0301", request_timeout=240, max_tokens=1024, model_kwargs=dict(temperature=0.1)
+    model_name="gpt-3.5-turbo-0301", request_timeout=240, max_tokens=1024, model_kwargs=dict(temperature=0.5)
 )
 simpler_chat_model = TrackedChatModel(chat_model=simpler_chat_model)
 
@@ -161,6 +162,11 @@ class OptimizationStep(GenericModel, Generic[T_TaskParameters, T_TaskResults, T_
     )
 
 
+class ImprovementProbability(BaseModel):
+    considerations: list[str] = Field(..., description="The considerations for potential improvements.")
+    probability: float = Field(..., description="The probability of improvement.")
+
+
 class LLMOptimizer:
     @llm_explicit_function
     @staticmethod
@@ -200,41 +206,16 @@ class LLMOptimizer:
     @staticmethod
     def probability_for_improvement(
         language_model, optimization_info: OptimizationInfo[T_TaskParameters, T_TaskResults, T_Hyperparameters]
-    ) -> typing.Annotated[
-        float,
-        Field(
-            ge=0.0,
-            le=1.0,
-            description="The self-reported probability that the next optimization steps will improve the hyperparameters.",
-        ),
-    ]:
+    ) -> ImprovementProbability:
         """
-        Return the probability for improvement.
+        Return the probability for improvement (between 0 and 1).
+
+        This is your confidence that your next optimization steps will improve the hyperparameters given the information
+        provided. If you think that the information available is unlikely to lead to better hyperparameters, return 0.
+        If you think that the information available is very likely to lead to better hyperparameters, return 1.
+        Be concise.
         """
         raise NotImplementedError()
-
-
-@dataclass
-class CapturedFuncArgsKWArgs:
-    f: typing.Callable
-    args: tuple
-    kwargs: dict
-
-
-P = typing.ParamSpec("P")
-T = typing.TypeVar('T')
-
-
-class CaptureFuncArgsKWArgs:
-    def __matmul__(self, f: typing.Callable[P, T]) -> typing.Callable[P, CapturedFuncArgsKWArgs]:
-        @functools.wraps(f)
-        def wrapper(*args, **kwargs):
-            return CapturedFuncArgsKWArgs(f=f, args=args, kwargs=kwargs)
-
-        return wrapper
-
-
-capture_func_args_kwargs = CaptureFuncArgsKWArgs()
 
 
 def capture_task_run(
@@ -243,9 +224,7 @@ def capture_task_run(
     task_parameters: T_TaskParameters,
     hyperparameters: BaseModel,
 ) -> TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]:
-    """
-    Capture the task run.
-    """
+    """Capture the task run."""
     tracked_chat_model = track_langchain(llm_interface)
 
     structured_prompt = task_executor.llm_bound_signature(**dict(task_parameters)).structured_prompt
@@ -276,9 +255,7 @@ def optimize_hyperparameters(
     task_executor,
     seed_task_runs: list[TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]],
 ) -> OptimizationStep[T_TaskParameters, T_TaskResults, T_Hyperparameters]:
-    """
-    Optimize the hyperparameters.
-    """
+    """Optimize the hyperparameters."""
 
     task_root_chain = ChatChain(task_chat_model, [])
     root_chain = ChatChain(chat_model, [])
@@ -309,7 +286,7 @@ def optimize_hyperparameters(
     )
 
     optimization_step = None
-    for _ in range(1):
+    for _ in range(2):
         optimization_step = LLMOptimizer.suggest_next_optimization_step(root_chain, optimization_info)
 
         optimization_info.best_hyperparameters = optimization_step.best_hyperparameters
@@ -340,7 +317,7 @@ def optimize_hyperparameters(
             )
             optimization_info.task_infos = optimization_info.task_infos[-10:]
 
-        if LLMOptimizer.probability_for_improvement(root_chain, optimization_info) < 0.5:
+        if LLMOptimizer.probability_for_improvement(root_chain, optimization_info).probability < 0.5:
             break
 
     return optimization_step
@@ -361,9 +338,7 @@ def create_essay_topics(
     domain: str = Field(..., description="The domain or general area of the essay topic"),
     n: int = Field(..., description="Number of topics to generate"),
 ) -> list[str]:
-    """
-    Create a list of essay topics.
-    """
+    """Create a list of essay topics."""
     raise NotImplementedError()
 
 
@@ -385,7 +360,17 @@ essay_topics = [
 
 wandb.init(project="blackboard-pagi", name="optimization_unit_spike")
 
-with wandb_tracer("BBO", module_filters="blackboard_pagi.*", stack_frame_context=0) as trace_builder:
+
+def get_json_trace_filename(title: str) -> str:
+    """Get a filename for the resulting trace based on the title and the current date+time."""
+    return f"{title}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+
+
+event_handlers = [JsonFileWriter(get_json_trace_filename("optimization_unit_trace_ada")), TraceViewerIntegration()]
+
+with wandb_tracer(
+    "BBO", module_filters="blackboard_pagi.*", stack_frame_context=0, event_handlers=event_handlers
+) as trace_builder:
     seed_task_runs = [
         capture_task_run(
             ChatChain(simpler_chat_model, []),
@@ -402,14 +387,4 @@ with wandb_tracer("BBO", module_filters="blackboard_pagi.*", stack_frame_context
     for task_run in seed_task_runs:
         task_run.hyperparameters = all_hyperparameters
 
-    # %%
-
     optimization_step = optimize_hyperparameters(chat_model, simpler_chat_model, create_essay_topics, seed_task_runs)
-
-# save builder.build() as json file
-
-json_trace = trace_builder.build().dict()
-import json
-
-with open("optimization_unit_trace_ada.json", "w") as f:
-    json.dump(json_trace, f)

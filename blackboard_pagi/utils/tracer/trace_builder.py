@@ -97,6 +97,7 @@ class TraceNodeBuilder:
             event_id=self.event_id,
             start_time_ms=self.start_time_ms,
             end_time_ms=self.end_time_ms or default_timer(),
+            running=self.end_time_ms is None,
             delta_frame_infos=self.delta_frame_infos,
             properties=self.properties,
             children=[sub_event.build() for sub_event in self.children],
@@ -113,12 +114,13 @@ class TraceBuilderEventHandler:
 
 class TraceViewerIntegration(TraceBuilderEventHandler):
     def on_scope_final(self, builder: 'TraceBuilder'):
-        trace_viewer_send_trace_builder(self, force=True)
+        trace_viewer_send_trace_builder(builder, force=True)
 
     def on_event_scope_final(self, builder: 'TraceBuilder'):
-        trace_viewer_send_trace_builder(self, force=False)
+        trace_viewer_send_trace_builder(builder, force=False)
 
 
+@dataclass
 class JsonFileWriter(TraceBuilderEventHandler):
     filename: str
 
