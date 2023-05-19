@@ -7,15 +7,11 @@ from enum import Enum
 
 import pynecone as pc
 import pynecone.pc as cli
-from pcconfig import config
 from starlette import status
-from trace_viewer.flame_graph import FlameGraphNode, flame_graph
-from trace_viewer.json_view import json_view
 
+from blackboard_pagi.tools.trace_viewer.app.flame_graph import FlameGraphNode, flame_graph
+from blackboard_pagi.tools.trace_viewer.app.json_view import json_view
 from blackboard_pagi.utils.tracer import Trace, TraceNode, TraceNodeKind
-
-docs_url = "https://pynecone.io/docs/getting-started/introduction"
-filename = f"{config.app_name}/{config.app_name}.py"
 
 
 # solarized colors as HTML hex
@@ -163,9 +159,10 @@ def convert_trace_to_flame_graph_data(trace: Trace) -> dict:
             last_ms = child.end_time_ms
 
         duration_s = node.end_time_ms - node.start_time_ms
+        node_name = node.name or "/Unnamed/"
         return FlameGraphNode(
             id=str(node.event_id),
-            name=node.name if not node.running else f"{node.name} (*)",
+            name=node_name if not node.running else f"{node_name} (*)",
             value=duration_s * discount,
             children=children,
             background_color=convert_trace_node_kind_to_color(node.kind),

@@ -1,7 +1,7 @@
 import pynecone as pc
 
 config = pc.Config(
-    app_name="trace_viewer",
+    app_name="app",
     db_url="sqlite:///pynecone.db",
     port=3333,
     backend_port=8333,

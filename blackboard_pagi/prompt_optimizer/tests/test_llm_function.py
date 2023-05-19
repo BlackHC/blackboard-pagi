@@ -474,12 +474,11 @@ def test_llm_function():
             'schemas below.\n\nAs an example, for the schema {"properties": {"foo": {"description": "a list of '
             'strings", "type": "array", "items": {"type": "string"}}}, "required": ["foo"]}} the object {"foo": ['
             '"bar", "baz"]} is a well-formatted instance of the schema. The object {"properties": {"foo": ["bar", '
-            '"baz"]}} is not well-formatted.\n\nHere is the schema for additional date types:\n```\n{}\n```\n\nHere '
-            'is the input schema:\n```\n{\n "properties": {\n  "a": {\n   "type": "integer"\n  },\n  "b": {\n   '
-            '"type": "integer"\n  }\n },\n "required": [\n  "a",\n  "b"\n ]\n}\n```\n\nHere is the output '
-            'schema:\n```\n{\n "properties": {\n  "return_value": {\n   "type": "integer"\n  }\n },\n "required": [\n '
-            ' "return_value"\n ]\n}\n```\nNow output the results for the following inputs:\n```\n{\n "a": 1,'
-            '\n "b": 2\n}\n```\n '
+            '"baz"]}} is not well-formatted.\n\nHere is the input schema:\n```\n{\n"properties": {\n"a": {\n"type": '
+            '"integer"\n},\n"b": {\n"type": "integer"\n}\n},\n"required": [\n"a",\n"b"\n]\n}\n```\n\nHere is the '
+            'output schema:\n```\n{\n"properties": {\n"return_value": {\n"type": "integer"\n}\n},\n"required": ['
+            '\n"return_value"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n"a": 1,'
+            '\n"b": 2\n}\n```'
             '{"return_value": 3}'
         ]
     )

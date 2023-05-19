@@ -3,9 +3,10 @@ import typing
 from dataclasses import dataclass
 
 import requests
-from trace_viewer import pcconfig
 
 from blackboard_pagi.utils.weakrefs import WeakKeyIdMap
+
+from . import pcconfig
 
 if typing.TYPE_CHECKING:
     from blackboard_pagi.utils.tracer import TraceBuilder

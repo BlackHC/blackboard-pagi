@@ -14,8 +14,8 @@ from functools import partial, wraps
 from typing import ClassVar
 
 from langchain.schema import BaseMessage
-from trace_viewer.endpoint_integration import trace_viewer_send_trace_builder
 
+from blackboard_pagi.tools.trace_viewer.endpoint_integration import trace_viewer_send_trace_builder
 from blackboard_pagi.utils.callable_wrapper import CallableWrapper
 from blackboard_pagi.utils.tracer import module_filtering
 from blackboard_pagi.utils.tracer.frame_info import FrameInfo, get_frame_infos
