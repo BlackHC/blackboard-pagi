@@ -27,65 +27,72 @@ class MainPromptTemplate(prompt_template.PromptTemplateMixin):
 
     user_prompt: str
 
-    prompt_template = """You are a large language model and act as a virtual assistant that has access to a scratchpad for documents,
-which we call a blackboard.
-
-# Instructions
-
-You have access to several tools. You can invoke tools by ending your answer with a YAML block. For example, you
-can invoke a Google search for "OpenAI" by ending your answer with:
-
-```yaml
-
----
-invoke-tool: search-google
-query: OpenAI
----
-```
-
-You must include a tool property in the YAML block with the name of the tool you want to invoke.
-You can also pass parameters using YAML syntax depending on the tool (see the definitions below).
-
-If you don't want to invoke a tool, you can end your answer with a YAML block that contains a `tool` property with
-the value `none` to indicate that you don't want to invoke a tool. Make sure to always include an answer, even if
-it is just a single word and do not end your answer with a YAML block if you don't want to invoke a tool.
-
-You have the following tools available with the parameters specified using $parameter syntax:
-- "search-google": search Google for a $query and return the top $num_results results (default: 1).
-- "search-wikipedia": search Wikipedia for a $query and return the top $num_results results (default: 1)..
-- "memorize": memorize $note on the blackboard. You can then recall the note using the `recall` tool below.
-- "recall": recall the $association from the blackboard. We match the $association using its semantic to
-    all the notes on the blackboard and return the top $num_results results (default: 1).
-- "ask-user": ask the user a $question and return the user's response.
-
-After you stop, we will execute the tool you invoked and return the result in the YAML block in a 'result' property.
-For example, if you invoke the `search-google` tool, we will return the top result in the YAML block as follows:
-
-For example:
-```yaml
----
-tool: search-google
-query: OpenAI
-result:
-    title: OpenAI
-    url: https://openai.com/
-    description: OpenAI is an artificial intelligence research company founded in 2015 by Elon Musk, Sam Altman, Ilya
-        Sutskever, Greg Brockman, and Wojciech Zaremba.
----
-
-```
-
-Now, we will give your the main task. Think step by step and try to solve the problem. You can use the tools
-described above to help you solve the problem. Try to write valid markdown in your answer except for the YAML
-block at the end of your answer.
-
-# Prompt
-
-{user_prompt}
-
-# Answer
-
-"""
+    prompt_template = (
+        "You are a large language model and act as a virtual assistant that has access to a scratchpad for documents,\n"
+        "which we call a blackboard.\n"
+        "\n"
+        "# Instructions\n"
+        "\n"
+        "You have access to several tools. You can invoke tools by ending your answer with a YAML block. For example, "
+        "you can invoke a Google search for \"OpenAI\" by ending your answer with:\n"
+        "\n"
+        "```yaml\n"
+        "\n"
+        "---\n"
+        "invoke-tool: search-google\n"
+        "query: OpenAI\n"
+        "---\n"
+        "```\n"
+        "\n"
+        "You must include a tool property in the YAML block with the name of the tool you want to invoke. "
+        "You can also pass parameters using YAML syntax depending on the tool (see the definitions below).\n"
+        "\n"
+        "If you don't want to invoke a tool, you can end your answer with a YAML block that contains a `tool` "
+        "property with the value `none` to indicate that you don't want to invoke a tool. Make sure to always include "
+        "an answer, even if it is just a single word and do not end your answer with a YAML block if you don't want to "
+        "invoke a tool.\n"
+        "\n"
+        "You have the following tools available with the parameters specified using $parameter syntax:\n"
+        "- \"search-google\": search Google for a $query and return the top $num_results results (default: 1).\n"
+        "- \"search-wikipedia\": search Wikipedia for a $query and return the top $num_results results (default: 1)..\n"
+        "- \"memorize\": memorize $note on the blackboard. You can then recall the note using the `recall` tool "
+        "below.\n"
+        "- \"recall\": recall the $association from the blackboard. We match the $association using its semantic to\n"
+        "    all the notes on the blackboard and return the top $num_results results (default: 1).\n"
+        "- \"ask-user\": ask the user a $question and return the user's response.\n"
+        "\n"
+        "After you stop, we will execute the tool you invoked and return the result in the YAML block in a 'result' "
+        "property.\n"
+        "For example, if you invoke the `search-google` tool, we will return the top result in the YAML block as "
+        "follows:\n"
+        "\n"
+        "For example:\n"
+        "```yaml\n"
+        "---\n"
+        "tool: search-google\n"
+        "query: OpenAI\n"
+        "result:\n"
+        "    title: OpenAI\n"
+        "    url: https://openai.com/\n"
+        "    description: OpenAI is an artificial intelligence research company founded in 2015 by Elon Musk, Sam "
+        "Altman, Ilya\n"
+        "        Sutskever, Greg Brockman, and Wojciech Zaremba.\n"
+        "---\n"
+        "\n"
+        "```\n"
+        "\n"
+        "Now, we will give your the main task. Think step by step and try to solve the problem. You can use the tools\n"
+        "described above to help you solve the problem. Try to write valid markdown in your answer except for the "
+        "YAML\n"
+        "block at the end of your answer.\n"
+        "\n"
+        "# Prompt\n"
+        "\n"
+        "{user_prompt}\n"
+        "\n"
+        "# Answer\n"
+        "\n"
+    )
 
 
 @dataclass
@@ -95,28 +102,29 @@ class SummarizePromptTemplate(prompt_template.PromptTemplateMixin):
     user_prompt: str
     answer: str
 
-    prompt_template = """You are a large language assistant. You have hit your token limit for a request and we are going to summarize the
-answer below to reduce the prompt token count and ensure enough tokens are available to generate a full response by you
-later.
-
-Summarize the given answer so far with regard to the main goal, such that you can continue to answer the
-prompt with the summarized answer later. Stop as soon as you have summarized the answer so far. Do not attempt to
-answer the prompt yourself.
-
-The original answer includes YAML blocks. You can summarize the YAML blocks as well, but preserve the YAML syntax for
-them.
-
-# Prompt
-
-{user_prompt}
-
-# Answer
-
-{answer}
-
-# Shortened Partial Answer
-
-"""
+    prompt_template = (
+        "You are a large language assistant. You have hit your token limit for a request and we are going to summarize "
+        "the answer below to reduce the prompt token count and ensure enough tokens are available to generate a full "
+        "response by you later.\n"
+        "\n"
+        "Summarize the given answer so far with regard to the main goal, such that you can continue to answer the\n"
+        "prompt with the summarized answer later. Stop as soon as you have summarized the answer so far. "
+        "Do not attempt to answer the prompt yourself.\n"
+        "\n"
+        "The original answer includes YAML blocks. You can summarize the YAML blocks as well, but preserve the YAML "
+        "syntax for them.\n"
+        "\n"
+        "# Prompt\n"
+        "\n"
+        "{user_prompt}\n"
+        "\n"
+        "# Answer\n"
+        "\n"
+        "{answer}\n"
+        "\n"
+        "# Shortened Partial Answer\n"
+        "\n"
+    )
 
 
 def approximate_token_count(text: str) -> int:
@@ -195,51 +203,52 @@ class SearchGooglePromptTemplate(prompt_template.PromptTemplateMixin):
 
     invocation: str
 
-    prompt_template = """You are a large language assistant. You are emulating Google search now (for integration testing purposes).
-You are given a YAML block with a query (`query` property) and a number of results to return (`num_results` property,
-or default: 1).
-
-You return the top results as a in the YAML block in a `results` property. Each result is a dictionary with the
-following properties:
-- `title`: the title of the result.
-- `url`: the URL of the result.
-- `description`: the description of the result.
-
-For example, for:
-```yaml
----
-tool: search-google
-query: OpenAI
-num_results: 2
----
-```
-
-You return:
-```yaml
----
-tool: search-google
-query: OpenAI
-result:
-    - title: OpenAI
-      url: https://openai.com/
-      description: OpenAI is an artificial intelligence research company founded in 2015 by Elon Musk, Sam Altman,
-                    Ilya Sutskever, Greg Brockman, and Wojciech Zaremba.
-    - title: OpenAI GPT-3
-      url: https://openai.com/blog/openai-api/
-      description: OpenAI API is a new service that gives developers access to OpenAI’s state-of-the-art language
-                    models.
----
-```
-
-# Invocation
-
----
-{invocation}
----
-
-# Result YAML Block
-
-"""
+    prompt_template = (
+        "You are a large language assistant. You are emulating Google search now (for integration testing purposes).\n"
+        "You are given a YAML block with a query (`query` property) and a number of results to return (`num_results` "
+        "property, or default: 1).\n"
+        "\n"
+        "You return the top results as a in the YAML block in a `results` property. Each result is a dictionary with "
+        "the following properties:\n"
+        "- `title`: the title of the result.\n"
+        "- `url`: the URL of the result.\n"
+        "- `description`: the description of the result.\n"
+        "\n"
+        "For example, for:\n"
+        "```yaml\n"
+        "---\n"
+        "tool: search-google\n"
+        "query: OpenAI\n"
+        "num_results: 2\n"
+        "---\n"
+        "```\n"
+        "\n"
+        "You return:\n"
+        "```yaml\n"
+        "---\n"
+        "tool: search-google\n"
+        "query: OpenAI\n"
+        "result:\n"
+        "    - title: OpenAI\n"
+        "      url: https://openai.com/\n"
+        "      description: OpenAI is an artificial intelligence research company founded in 2015 by Elon Musk, "
+        "Sam Altman, Ilya Sutskever, Greg Brockman, and Wojciech Zaremba.\n"
+        "    - title: OpenAI GPT-3\n"
+        "      url: https://openai.com/blog/openai-api/\n"
+        "      description: OpenAI API is a new service that gives developers access to OpenAI’s state-of-the-art "
+        "language models.\n"
+        "---\n"
+        "```\n"
+        "\n"
+        "# Invocation\n"
+        "\n"
+        "---\n"
+        "{invocation}\n"
+        "---\n"
+        "\n"
+        "# Result YAML Block\n"
+        "\n"
+    )
 
 
 def generate_note(user_prompt: str, answer: str) -> str:

@@ -17,7 +17,7 @@ from langchain.chat_models.base import BaseChatModel
 from langchain.llms import BaseLLM
 from langchain.schema import BaseLanguageModel, OutputParserException
 from pydantic import BaseModel, ValidationError, create_model, generics
-from pydantic.fields import FieldInfo, ModelField, Undefined
+from pydantic.fields import FieldInfo, Undefined
 from pydantic.generics import replace_types
 
 from blackboard_pagi.prompt_optimizer.track_hyperparameters import Hyperparameter, track_hyperparameters
@@ -260,7 +260,7 @@ class LLMStructuredPrompt(typing.Generic[B, T]):
     @staticmethod
     def resolve_generic_types(model: type[BaseModel], instance: BaseModel):
         generic_type_map: dict = {}
-        field_definition: ModelField
+
         for (field_name, attr_value) in list(instance):
             if field_name not in model.__annotations__:
                 continue

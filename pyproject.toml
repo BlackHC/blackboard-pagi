@@ -19,7 +19,7 @@ packages = [
     { include = "blackboard_pagi" },
     { include = "tests", format = "sdist" },
     # Include all files under blackboard_pagi/blackboard/template
-    { include = "blackboard_pagi/blackboard/template/**/*" }
+  #  { include = "blackboard_pagi/blackboard/template/**/*" }
 ]
 
 [tool.poetry.dependencies]
