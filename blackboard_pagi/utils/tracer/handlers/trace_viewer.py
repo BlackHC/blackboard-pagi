@@ -1,5 +1,5 @@
 from blackboard_pagi.tools.trace_viewer.endpoint_integration import trace_viewer_send_trace_builder
-from blackboard_pagi.utils.tracer import TraceBuilder, TraceBuilderEventHandler
+from blackboard_pagi.utils.tracer.trace_builder import TraceBuilder, TraceBuilderEventHandler
 
 
 class TraceViewerIntegration(TraceBuilderEventHandler):

@@ -2,7 +2,7 @@ import json
 import os
 from dataclasses import dataclass
 
-from blackboard_pagi.utils.tracer import TraceBuilder, TraceBuilderEventHandler
+from blackboard_pagi.utils.tracer.trace_builder import TraceBuilder, TraceBuilderEventHandler
 
 
 @dataclass
