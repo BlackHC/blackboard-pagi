@@ -201,7 +201,7 @@ var module, window, define, renderjson = (function() {
         pre_text.style.whiteSpace = "pre-wrap";
         pre_text.style.display ="inline-flex";
         pre_text.style.overflow = "auto";
-        pre_text.style.maxHeight = "25em";
+        pre_text.style.maxHeight = "20em";
         // add borders for overflow
         pre_text.style.border = "1px solid #ccc";
         // scrollbar-gutter: stable;
@@ -371,7 +371,7 @@ else(module || {}).exports = (window || {}).renderjson = renderjson;]]></script>
                         updateDetails(parent);
                     }
                 }
-                ]]></script><use height="340" id="zoom_view" width="100%" x="0" xlink:href="#full_view" y="0" /><foreignObject height="420" width="100%" x="0" y="20em"><html:html style="height: 100%;">
+                ]]></script><use height="200" id="zoom_view" width="100%" x="0" xlink:href="#full_view" y="0" /><foreignObject height="560" width="100%" x="0" y="20em"><html:html style="height: 100%;">
 <html:body style="height: 100%;">
 <html:div style="height: 100%; display: flex; flex-direction: column; background-color: #eee8d5;">
     <html:style>
@@ -399,7 +399,7 @@ else(module || {}).exports = (window || {}).renderjson = renderjson;]]></script>
         }
     </html:style>
     <html:strong>Click on a node to zoom in and see more details. Click on the zoomed in node to zoom out.</html:strong>
-    <html:h1>Scope Details</html:h1>
+    <html:h2>Scope Details</html:h2>
     <html:div id="details" style="overflow: auto; font-family: monospace;">
         <html:table style="border: 1px none black; border-collapse: collapse; width: 100%;">
             <html:tr style="border: 1px none black; border-collapse: collapse;">

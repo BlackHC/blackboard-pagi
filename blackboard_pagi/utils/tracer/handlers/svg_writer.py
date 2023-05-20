@@ -236,7 +236,7 @@ var module, window, define, renderjson = (function() {
         pre_text.style.whiteSpace = "pre-wrap";
         pre_text.style.display ="inline-flex";
         pre_text.style.overflow = "auto";
-        pre_text.style.maxHeight = "25em";
+        pre_text.style.maxHeight = "20em";
         // add borders for overflow
         pre_text.style.border = "1px solid #ccc";
         // scrollbar-gutter: stable;
@@ -573,14 +573,14 @@ def create_svg_from_trace(trace: Trace):
     for node in trace.traces:
         traverse_node(node, symbol, level=0, parent_start_time_ms=start_time, parent_duration_ms=end_time - start_time)
 
-    zoom_use = dwg.use(id='zoom_view', x=0, y=0, width="100%", height=total_height - 420, href=symbol.get_iri())
+    zoom_use = dwg.use(id='zoom_view', x=0, y=0, width="100%", height=total_height - 560, href=symbol.get_iri())
     dwg.add(zoom_use)
 
     details_pane = dwg.foreignObject(
         x=0,
         y="20em",
         width="100%",
-        height=420,
+        height=560,
         inner_xml=etree.fromstring(
             """
 <html xmlns="http://www.w3.org/1999/xhtml" style="height: 100%;">
@@ -611,7 +611,7 @@ def create_svg_from_trace(trace: Trace):
         }
     </style>
     <strong>Click on a node to zoom in and see more details. Click on the zoomed in node to zoom out.</strong>
-    <h1>Scope Details</h1>
+    <h2>Scope Details</h2>
     <div id="details" style="overflow: auto; font-family: monospace;">
         <table style="border: 1px none black; border-collapse: collapse; width: 100%;">
             <tr style="border: 1px none black; border-collapse: collapse;">
