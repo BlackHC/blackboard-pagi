@@ -7,6 +7,7 @@ from enum import Enum
 
 import pynecone as pc
 import pynecone.pc as cli
+from pydantic import Field
 from starlette import status
 
 from blackboard_pagi.tools.trace_viewer.app.flame_graph import FlameGraphNode, flame_graph
@@ -185,12 +186,12 @@ class State(pc.State):
     ]
 
     flame_graph_data: dict = FlameGraphNode(name="", value=1, background_color="#00000000", children=[]).dict()
-    current_node: list[NodeInfo] = []
-    _trace: Trace | None = None
-    trace_name: str | None = None
-    _event_id_map: dict[int, TraceNode] = dict()
+    current_node: list[NodeInfo] = Field(default_factory=list)
+    _trace: Trace | None = Field(default=None)
+    trace_name: str | None = Field(default=None)
+    _event_id_map: dict[int, TraceNode] = Field(default_factory=dict)
 
-    injected_trace_names: list[str] = []
+    injected_trace_names: list[str] = Field(default_factory=list)
 
     def register_state(self):
         """Register this state to receive updates."""
@@ -206,8 +207,8 @@ class State(pc.State):
     def load_default_flame_graph(self):
         self._trace = load_example_trace()
         self.trace_name = None
-        self.update_flame_graph()
         self.mark_dirty()
+        return self.update_flame_graph
 
     async def handle_trace_upload(self, files: list[pc.UploadFile]):
         """Handle the upload of a file.
@@ -221,7 +222,7 @@ class State(pc.State):
         upload_data = await file.read()
         self._trace = Trace.parse_raw(upload_data)  # type: ignore
         self.trace_name = None
-        self.update_flame_graph()
+        return self.update_flame_graph
 
     def update_flame_graph(self):
         if self._trace is None:
@@ -231,27 +232,28 @@ class State(pc.State):
             self._event_id_map = self._trace.build_event_id_map()
             self.flame_graph_data = convert_trace_to_flame_graph_data(self._trace)
         self.current_node = []
+        self.mark_dirty()
 
     def on_injected_trace(self, trace_name: str):
         """Handle an injected trace event."""
-        print(f"Received injected trace {trace_name}")
         self.injected_trace_names = list(streamed_traced_singleton.traces.keys())
-        print(f"Injected traces: {self.injected_trace_names}")
 
         if self._trace is None:
             self.trace_name = trace_name
 
         if self.trace_name == trace_name:
             self._trace = streamed_traced_singleton.traces.get(trace_name, None)  # type: ignore
-            self.update_flame_graph()
-        self.mark_dirty()
+            self.mark_dirty()
+
+            return self.update_flame_graph
 
     def handle_trace_selection(self, trace_name: str):
         """Handle the selection of a trace."""
         self.trace_name = trace_name
         self._trace = streamed_traced_singleton.traces.get(trace_name, None)  # type: ignore
-        self.update_flame_graph()
         self.mark_dirty()
+
+        return self.update_flame_graph
 
     def update_current_node(self, chart_data: dict):
         node_id = chart_data["source"].get("id", None)
@@ -381,9 +383,13 @@ def index() -> pc.Component:
                             pc.button("Load", on_click=lambda: State.handle_trace_upload(pc.upload_files())),
                             pc.divider(margin="0.5em"),
                             pc.select(
-                                State.injected_trace_names,
+                                pc.cond(
+                                    State.injected_trace_names,
+                                    State.injected_trace_names,
+                                    ["No traces available"],
+                                ),
                                 is_disabled=State.injected_trace_names.length() == 0,
-                                value=State.trace_name,
+                                value=State.trace_name | "",
                                 placeholder="Select an available trace",
                                 on_change=State.handle_trace_selection,
                             ),
@@ -395,15 +401,20 @@ def index() -> pc.Component:
                     ),
                 ),
             ),
-            flame_graph(
-                width=1024,
-                height=100,
-                data=State.flame_graph_data,
-                on_change=lambda data: State.update_current_node(data),  # type: ignore
-            ),
-            pc.foreach(
-                State.current_node,
-                render_node_info,
+            pc.cond(
+                State.flame_graph_data,
+                pc.fragment(
+                    flame_graph(
+                        width=1024,
+                        height=100,
+                        data=State.flame_graph_data,
+                        on_change=lambda data: State.update_current_node(data),  # type: ignore
+                    ),
+                    pc.foreach(
+                        State.current_node,
+                        render_node_info,
+                    ),
+                ),
             ),
         ),
         padding_top="64px",

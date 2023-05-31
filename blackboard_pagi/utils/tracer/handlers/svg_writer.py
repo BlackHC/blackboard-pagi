@@ -236,7 +236,7 @@ var module, window, define, renderjson = (function() {
         pre_text.style.whiteSpace = "pre-wrap";
         pre_text.style.display ="inline-flex";
         pre_text.style.overflow = "auto";
-        pre_text.style.maxHeight = "20em";
+        pre_text.style.maxHeight = "400px";
         // add borders for overflow
         pre_text.style.border = "1px solid #ccc";
         // scrollbar-gutter: stable;
@@ -578,13 +578,13 @@ def create_svg_from_trace(trace: Trace):
 
     details_pane = dwg.foreignObject(
         x=0,
-        y="20em",
+        y=total_height - 560,
         width="100%",
         height=560,
         inner_xml=etree.fromstring(
             """
 <html xmlns="http://www.w3.org/1999/xhtml" style="height: 100%;">
-<body style="height: 100%;">
+<body style="height: 100%; margin: 0px; padding: 2px;">
 <div style="height: 100%; display: flex; flex-direction: column; background-color: #eee8d5;">
     <style>
         // Solarized Light Color Scheme (Different Colors for Different Types)

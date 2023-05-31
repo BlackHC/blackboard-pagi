@@ -55,4 +55,9 @@ def trace_viewer_send_trace_builder(trace_builder: 'TraceBuilder', force: bool =
 
     url = pcconfig.config.api_url + "/trace/" + trace_updates.token
     payload = trace.dict()
-    requests.post(url, json=payload)
+    try:
+        requests.post(url, json=payload, timeout=0.05)
+    except requests.exceptions.ConnectionError:
+        # If the connection fails, we don't want to delete the trace updates object
+        # so that the trace will be sent when the connection is restored
+        pass

@@ -201,7 +201,7 @@ var module, window, define, renderjson = (function() {
         pre_text.style.whiteSpace = "pre-wrap";
         pre_text.style.display ="inline-flex";
         pre_text.style.overflow = "auto";
-        pre_text.style.maxHeight = "20em";
+        pre_text.style.maxHeight = "400px";
         // add borders for overflow
         pre_text.style.border = "1px solid #ccc";
         // scrollbar-gutter: stable;
@@ -371,8 +371,8 @@ else(module || {}).exports = (window || {}).renderjson = renderjson;]]></script>
                         updateDetails(parent);
                     }
                 }
-                ]]></script><use height="200" id="zoom_view" width="100%" x="0" xlink:href="#full_view" y="0" /><foreignObject height="560" width="100%" x="0" y="20em"><html:html style="height: 100%;">
-<html:body style="height: 100%;">
+                ]]></script><use height="200" id="zoom_view" width="100%" x="0" xlink:href="#full_view" y="0" /><foreignObject height="560" width="100%" x="0" y="200"><html:html style="height: 100%;">
+<html:body style="height: 100%; margin: 0px; padding: 2px;">
 <html:div style="height: 100%; display: flex; flex-direction: column; background-color: #eee8d5;">
     <html:style>
         // Solarized Light Color Scheme (Different Colors for Different Types)

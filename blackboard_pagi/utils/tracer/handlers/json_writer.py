@@ -16,6 +16,6 @@ class JsonFileWriter(TraceBuilderEventHandler):
         tempfile = self.filename + ".new_tmp"
 
         with open(tempfile, "w") as f:
-            json.dump(json_trace, f)
+            json.dump(json_trace, f, indent=1)
 
         os.replace(tempfile, self.filename)
