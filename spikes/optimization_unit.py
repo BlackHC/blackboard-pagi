@@ -1,10 +1,7 @@
 """
 Spike for a meta-loop that optimizes the prompt templates we use.
 """
-import functools
 import traceback
-import typing
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Generic, TypeVar
 
@@ -46,7 +43,7 @@ chat_model = TrackedChatModel(chat_model=chat_model)
 # simpler_chat_model = LLMAsChatModel(llm=simpler_llm)
 # chat_model = ChatOpenAI(max_tokens=512, model_kwargs=dict(temperature=0.5))
 simpler_chat_model = ChatOpenAI(
-    model_name="gpt-3.5-turbo-0301", request_timeout=240, max_tokens=1024, model_kwargs=dict(temperature=0.5)
+    model_name="gpt-3.5-turbo-0301", request_timeout=240, max_tokens=512, model_kwargs=dict(temperature=0.5)
 )
 simpler_chat_model = TrackedChatModel(chat_model=simpler_chat_model)
 

@@ -168,10 +168,10 @@ class LLMStructuredPrompt(typing.Generic[B, T]):
 
         return sub_schema
 
-    def get_json_schema(self) -> dict:
+    def get_json_schema(self, exclude_default: bool = True) -> dict:
         specific_input_type = type(self.input)
 
-        schema = pydantic.schema.schema([specific_input_type, self.output_type])
+        schema = pydantic.schema.schema([specific_input_type, self.output_type], ref_template="{model}")
         definitions: dict = deepcopy(schema["definitions"])
         # remove title and type from each sub dict in the definitions
         for value in definitions.values():
@@ -179,8 +179,9 @@ class LLMStructuredPrompt(typing.Generic[B, T]):
             value.pop("type")
 
             for property in value.get("properties", {}).values():
-                if "title" in property:
-                    property.pop("title")
+                property.pop("title", None)
+                if exclude_default:
+                    property.pop("default", None)
 
         input_schema = self.extract_from_definitions(definitions, specific_input_type)
         output_schema = self.extract_from_definitions(definitions, self.output_type)
