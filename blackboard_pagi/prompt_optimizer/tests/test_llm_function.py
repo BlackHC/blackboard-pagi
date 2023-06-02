@@ -35,7 +35,7 @@ from blackboard_pagi.prompt_optimizer.llm_function import (
     llm_function,
     update_json_schema_hyperparameters,
 )
-from blackboard_pagi.prompt_optimizer.track_execution_old import ChatChain
+from blackboard_pagi.prompts.chat_chain import ChatChain
 from blackboard_pagi.testing.fake_llm import FakeLLM
 
 

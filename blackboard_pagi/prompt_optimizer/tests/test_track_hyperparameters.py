@@ -99,7 +99,9 @@ def test_with_name():
         assert g() == "HelloHello"
 
     scope.hyperparameters[g].hello = "World"
-    assert g() == "WorldWorld"
+
+    with scope():
+        assert g() == "WorldWorld"
 
 
 def test_nested():
