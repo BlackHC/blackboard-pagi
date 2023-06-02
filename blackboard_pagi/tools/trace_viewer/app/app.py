@@ -1,4 +1,5 @@
 """Welcome to Pynecone! This file outlines the steps to create a basic app."""
+import json
 import pprint  # noqa: F401
 import threading
 import typing
@@ -187,11 +188,17 @@ class State(pc.State):
 
     flame_graph_data: dict = FlameGraphNode(name="", value=1, background_color="#00000000", children=[]).dict()
     current_node: list[NodeInfo] = Field(default_factory=list)
-    _trace: Trace | None = Field(default=None)
     trace_name: str | None = Field(default=None)
-    _event_id_map: dict[int, TraceNode] = Field(default_factory=dict)
+
+    _trace: Trace | None
+    _event_id_map: dict[int, TraceNode]
 
     injected_trace_names: list[str] = Field(default_factory=list)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._trace = None
+        self._event_id_map = {}
 
     def register_state(self):
         """Register this state to receive updates."""
@@ -236,6 +243,9 @@ class State(pc.State):
 
     def on_injected_trace(self, trace_name: str):
         """Handle an injected trace event."""
+        # parse trace_name as json
+        trace_name = json.loads(trace_name)
+
         self.injected_trace_names = list(streamed_traced_singleton.traces.keys())
 
         if self._trace is None:
@@ -251,6 +261,8 @@ class State(pc.State):
         """Handle the selection of a trace."""
         self.trace_name = trace_name
         self._trace = streamed_traced_singleton.traces.get(trace_name, None)  # type: ignore
+        if self._trace is None:
+            print(f"Could not find trace {trace_name}")
         self.mark_dirty()
 
         return self.update_flame_graph
@@ -383,13 +395,9 @@ def index() -> pc.Component:
                             pc.button("Load", on_click=lambda: State.handle_trace_upload(pc.upload_files())),
                             pc.divider(margin="0.5em"),
                             pc.select(
-                                pc.cond(
-                                    State.injected_trace_names,
-                                    State.injected_trace_names,
-                                    ["No traces available"],
-                                ),
+                                State.injected_trace_names,
                                 is_disabled=State.injected_trace_names.length() == 0,
-                                value=State.trace_name | "",
+                                value=State.trace_name,
                                 placeholder="Select an available trace",
                                 on_change=State.handle_trace_selection,
                             ),
@@ -424,7 +432,6 @@ def index() -> pc.Component:
 
 streamed_traced_singleton = StreamedTracesSingleton()
 
-
 meta = [
     {"name": "theme_color", "content": SolarizedColors.green},
     {"char_set": "UTF-8"},
@@ -453,7 +460,6 @@ async def inject_trace(trace_name: str, trace: Trace):
 
 
 app.compile()
-
 
 if __name__ == "__main__":
     cli.main()

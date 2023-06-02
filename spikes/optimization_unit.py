@@ -250,13 +250,22 @@ def optimize_hyperparameters(
     chat_model: BaseChatModel,
     task_chat_model: BaseChatModel,
     task_executor,
-    seed_task_runs: list[TaskRun[T_TaskParameters, T_TaskResults, T_Hyperparameters]],
+    seed_task_parameters: list[T_TaskParameters],
 ) -> OptimizationStep[T_TaskParameters, T_TaskResults, T_Hyperparameters]:
     """Optimize the hyperparameters."""
-
     task_root_chain = ChatChain(task_chat_model, [])
-    root_chain = ChatChain(chat_model, [])
 
+    seed_task_runs = [
+        capture_task_run(
+            llm_interface=task_root_chain,
+            task_executor=task_executor,
+            task_parameters=task_parameters,
+            hyperparameters=BaseModel(),
+        )
+        for task_parameters in seed_task_parameters
+    ]
+
+    root_chain = ChatChain(chat_model, [])
     llm_bound_signature = task_executor.llm_bound_signature(**dict(seed_task_runs[0].task_parameters))
 
     task_infos = []
@@ -363,25 +372,16 @@ def get_json_trace_filename(title: str) -> str:
     return f"{title}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
 
 
-event_handlers = [JsonFileWriter(get_json_trace_filename("optimization_unit_trace_ada")), TraceViewerIntegration()]
+event_handlers = [JsonFileWriter(get_json_trace_filename("optimization_unit_trace")), TraceViewerIntegration()]
 
 with wandb_tracer(
     "BBO", module_filters="blackboard_pagi.*", stack_frame_context=0, event_handlers=event_handlers
 ) as trace_builder:
-    seed_task_runs = [
-        capture_task_run(
-            ChatChain(simpler_chat_model, []),
-            create_essay_topics,
-            create_essay_topics.get_input_object(domain="comedy", n=2),
-            BaseModel(),
-        )
-        for topic in essay_topics[:2]
+    seed_task_parameters = [
+        create_essay_topics.get_input_object(domain="comedy", n=2),
+        create_essay_topics.get_input_object(domain="drama", n=2),
     ]
 
-    all_hyperparameters = Hyperparameters.merge(task_run.hyperparameters for task_run in seed_task_runs)
-
-    # Update seed task runs with the hyperparameters we found.
-    for task_run in seed_task_runs:
-        task_run.hyperparameters = all_hyperparameters
-
-    optimization_step = optimize_hyperparameters(chat_model, simpler_chat_model, create_essay_topics, seed_task_runs)
+    optimization_step = optimize_hyperparameters(
+        chat_model, simpler_chat_model, create_essay_topics, seed_task_parameters
+    )

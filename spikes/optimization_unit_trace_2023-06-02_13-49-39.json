@@ -1,0 +1,2490 @@
+{
+ "name": "optimization_unit_spike",
+ "traces": [
+  {
+   "kind": "SCOPE",
+   "name": "BBO",
+   "event_id": 1,
+   "start_time_ms": 1685710179020,
+   "end_time_ms": 1685710527006,
+   "running": false,
+   "delta_frame_infos": [
+    {
+     "module": "blackboard_pagi.utils.tracer.wandb_integration",
+     "lineno": 92,
+     "function": "wandb_tracer",
+     "code_context": null,
+     "index": null
+    }
+   ],
+   "properties": {
+    "exception": "Traceback (most recent call last):\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 536, in _make_request\n    response = conn.getresponse()\n               ^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connection.py\", line 454, in getresponse\n    httplib_response = super().getresponse()\n                       ^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/http/client.py\", line 1374, in getresponse\n    response.begin()\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/http/client.py\", line 318, in begin\n    version, status, reason = self._read_status()\n                              ^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/http/client.py\", line 279, in _read_status\n    line = str(self.fp.readline(_MAXLINE + 1), \"iso-8859-1\")\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/socket.py\", line 705, in readinto\n    return self._sock.recv_into(b)\n           ^^^^^^^^^^^^^^^^^^^^^^^\n\nTimeoutError: timed out\n\n\nThe above exception was the direct cause of the following exception:\n\n\nTraceback (most recent call last):\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/adapters.py\", line 486, in send\n    resp = conn.urlopen(\n           ^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 844, in urlopen\n    retries = retries.increment(\n              ^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/util/retry.py\", line 470, in increment\n    raise reraise(type(error), error, _stacktrace)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/util/util.py\", line 39, in reraise\n    raise value\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 790, in urlopen\n    response = self._make_request(\n               ^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 538, in _make_request\n    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 370, in _raise_timeout\n    raise ReadTimeoutError(\n\nurllib3.exceptions.ReadTimeoutError: HTTPConnectionPool(host='localhost', port=8333): Read timed out. (read timeout=0.05)\n\n\nDuring handling of the above exception, another exception occurred:\n\n\nTraceback (most recent call last):\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 195, in event_scope\n    yield\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 151, in scope\n    yield self\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/wandb_integration.py\", line 93, in wandb_tracer\n    yield builder\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/spikes/optimization_unit.py\", line 385, in <module>\n    optimization_step = optimize_hyperparameters(\n                        ^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/track_hyperparameters.py\", line 325, in __call__\n    return self.__wrapped__(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/spikes/optimization_unit.py\", line 309, in optimize_hyperparameters\n    reflection=LLMOptimizer.reflect_on_task_run(root_chain, task_run),\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/track_hyperparameters.py\", line 325, in __call__\n    return self.__wrapped__(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 318, in __call__\n    result = self.__wrapped__(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/llm_function.py\", line 755, in __call__\n    return_value = llm_bound_signature.structured_prompt(language_model_or_chat_chain)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 318, in __call__\n    result = self.__wrapped__(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/llm_function.py\", line 378, in __call__\n    parsed_output = self.query(language_model_or_chat_chain, schema)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/track_hyperparameters.py\", line 325, in __call__\n    return self.__wrapped__(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/llm_function.py\", line 452, in query\n    output, chain = chain.query(prompt)\n                    ^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompts/chat_chain.py\", line 35, in query\n    reply = self.chat_model(messages)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 316, in __call__\n    with builder.event_scope(self.__wrapped_name__, properties, kind=self.__kind__, skip_frames=1):\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/contextlib.py\", line 144, in __exit__\n    next(self.gen)\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 204, in event_scope\n    handler.on_event_scope_final(self)\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/handlers/trace_viewer.py\", line 10, in on_event_scope_final\n    trace_viewer_send_trace_builder(builder, force=False)\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/tools/trace_viewer/endpoint_integration.py\", line 59, in trace_viewer_send_trace_builder\n    requests.post(url, json=payload, timeout=0.05)\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/api.py\", line 115, in post\n    return request(\"post\", url, data=data, json=json, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/api.py\", line 59, in request\n    return session.request(method=method, url=url, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/sessions.py\", line 587, in request\n    resp = self.send(prep, **send_kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/sessions.py\", line 701, in send\n    r = adapter.send(request, **kwargs)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/adapters.py\", line 532, in send\n    raise ReadTimeout(e, request=request)\n\nrequests.exceptions.ReadTimeout: HTTPConnectionPool(host='localhost', port=8333): Read timed out. (read timeout=0.05)\n"
+   },
+   "children": [
+    {
+     "kind": "CHAIN",
+     "name": "create_essay_topics",
+     "event_id": 2,
+     "start_time_ms": 1685710179189,
+     "end_time_ms": 1685710184596,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.llm_function",
+       "lineno": 729,
+       "function": "explicit",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168f25510>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "kwargs": {
+        "domain": "comedy",
+        "n": 2
+       }
+      },
+      "result": [
+       "The role of humor in reducing stress and anxiety",
+       "The evolution of comedy in modern society"
+      ]
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 3,
+       "start_time_ms": 1685710179190,
+       "end_time_ms": 1685710184594,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 729,
+         "function": "explicit",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "domain": "comedy",
+         "n": 2
+        },
+        "result": [
+         "The role of humor in reducing stress and anxiety",
+         "The evolution of comedy in modern society"
+        ]
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 4,
+         "start_time_ms": 1685710179195,
+         "end_time_ms": 1685710184581,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 328,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Create a list of essay topics.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"domain\": \"comedy\",\n\"n\": 2\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n  \"return_value\": [\n    \"The role of humor in reducing stress and anxiety\",\n    \"The evolution of comedy in modern society\"\n  ]\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "create_essay_topics",
+     "event_id": 5,
+     "start_time_ms": 1685710184600,
+     "end_time_ms": 1685710188227,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.llm_function",
+       "lineno": 729,
+       "function": "explicit",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168f25510>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "kwargs": {
+        "domain": "drama",
+        "n": 2
+       }
+      },
+      "result": [
+       "The role of women in Shakespearean drama",
+       "The use of symbolism in modern drama"
+      ]
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 6,
+       "start_time_ms": 1685710184601,
+       "end_time_ms": 1685710188210,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 729,
+         "function": "explicit",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "domain": "drama",
+         "n": 2
+        },
+        "result": [
+         "The role of women in Shakespearean drama",
+         "The use of symbolism in modern drama"
+        ]
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 7,
+         "start_time_ms": 1685710184602,
+         "end_time_ms": 1685710188204,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 328,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Create a list of essay topics.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"domain\": \"drama\",\n\"n\": 2\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n\"return_value\": [\n\"The role of women in Shakespearean drama\",\n\"The use of symbolism in modern drama\"\n]\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "reflect_on_task_run",
+     "event_id": 8,
+     "start_time_ms": 1685710188231,
+     "end_time_ms": 1685710212933,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+       "lineno": 325,
+       "function": "__call__",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168d74b90>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "args": [
+        {
+         "task_parameters": {
+          "domain": "comedy",
+          "n": 2
+         },
+         "hyperparameters": {
+          "blackboard_pagi_prompt_optimizer_llm_function": {
+           "LLMStructuredPrompt_query": {
+            "json_dumps_kwargs": {
+             "indent": 0
+            },
+            "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+            "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+            "num_retries_on_parser_failure": 3
+           }
+          }
+         },
+         "all_chat_chains": [],
+         "return_value": [
+          "The role of humor in reducing stress and anxiety",
+          "The evolution of comedy in modern society"
+         ],
+         "exception": null
+        }
+       ]
+      },
+      "result": {
+       "feedback": "The generated essay topics are relevant to the comedy domain and satisfy the task description and parameters. The content seems to be derived from the given inputs and does not require any additional information from the all_chains and all_prompts fields.",
+       "evaluation": "The output is satisfying as it provides two essay topics related to the comedy domain. There is nothing wrong or missing in the output.",
+       "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+       "hyperparameter_missing": "There are no missing hyperparameters that need to be added for this task. The current hyperparameters seem to be sufficient for generating essay topics."
+      }
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 9,
+       "start_time_ms": 1685710188232,
+       "end_time_ms": 1685710212932,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+         "lineno": 325,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "task_run": {
+          "task_parameters": {
+           "domain": "comedy",
+           "n": 2
+          },
+          "hyperparameters": {
+           "blackboard_pagi_prompt_optimizer_llm_function": {
+            "LLMStructuredPrompt_query": {
+             "json_dumps_kwargs": {
+              "indent": 0
+             },
+             "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+             "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+             "num_retries_on_parser_failure": 3
+            }
+           }
+          },
+          "all_chat_chains": [],
+          "return_value": [
+           "The role of humor in reducing stress and anxiety",
+           "The evolution of comedy in modern society"
+          ],
+          "exception": null
+         }
+        },
+        "result": {
+         "feedback": "The generated essay topics are relevant to the comedy domain and satisfy the task description and parameters. The content seems to be derived from the given inputs and does not require any additional information from the all_chains and all_prompts fields.",
+         "evaluation": "The output is satisfying as it provides two essay topics related to the comedy domain. There is nothing wrong or missing in the output.",
+         "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+         "hyperparameter_missing": "There are no missing hyperparameters that need to be added for this task. The current hyperparameters seem to be sufficient for generating essay topics."
+        }
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 10,
+         "start_time_ms": 1685710188236,
+         "end_time_ms": 1685710212925,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 325,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Reflect on the results given the task parameters and hyperparameters.\n\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the schema for additional data types:\n```\n{\n\"CreateEssayTopicsInputs\": {\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n},\n\"QueryHyperparameters\": {\n\"properties\": {\n\"json_dumps_kwargs\": {\n\"type\": \"object\"\n},\n\"additional_definitions_prompt_template\": {\n\"type\": \"string\"\n},\n\"llm_structured_prompt_template\": {\n\"description\": \"The general-purpose prompt for the structured prompt execution. It tells the LLM what to do and how to read function arguments and structure return values. \",\n\"type\": \"string\"\n},\n\"num_retries_on_parser_failure\": {\n\"type\": \"integer\"\n}\n}\n},\n\"blackboard_pagi_prompt_optimizer_llm_functionModule\": {\n\"properties\": {\n\"LLMStructuredPrompt_query\": {\n\"allOf\": [\n{\n\"$ref\": \"QueryHyperparameters\"\n}\n]\n}\n}\n},\n\"Hyperparameters\": {\n\"properties\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"allOf\": [\n{\n\"$ref\": \"blackboard_pagi_prompt_optimizer_llm_functionModule\"\n}\n]\n}\n}\n},\n\"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\": {\n\"description\": \"The task run. This is the 'data' we use to optimize the hyperparameters.\",\n\"properties\": {\n\"task_parameters\": {\n\"description\": \"The task parameters.\",\n\"allOf\": [\n{\n\"$ref\": \"CreateEssayTopicsInputs\"\n}\n]\n},\n\"hyperparameters\": {\n\"description\": \"The hyperparameters used for the task. We optimize these.\",\n\"allOf\": [\n{\n\"$ref\": \"Hyperparameters\"\n}\n]\n},\n\"all_chat_chains\": {\n\"description\": \"The chat chains from the task execution.\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"object\"\n}\n},\n\"return_value\": {\n\"description\": \"The results of the task. (None for exceptions/failure.)\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n},\n\"exception\": {\n\"description\": \"Exception that occurred during the task execution.\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"task_parameters\",\n\"hyperparameters\",\n\"all_chat_chains\",\n\"return_value\",\n\"exception\"\n]\n},\n\"TaskReflection\": {\n\"description\": \"The reflections on the task.\\n\\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\",\n\"properties\": {\n\"feedback\": {\n\"description\": \"Only look at the final results field. Does its content satisfy the task description and task parameters? Does it contain all the relevant information from the all_chains and all_prompts fields? What could be improved in the results?\",\n\"type\": \"string\"\n},\n\"evaluation\": {\n\"description\": \"The evaluation of the outputs given the task. Is the output satisfying? What is wrong? What is missing?\",\n\"type\": \"string\"\n},\n\"hyperparameter_suggestion\": {\n\"description\": \"How we want to change the hyperparameters to improve the results. What could we try to change?\",\n\"type\": \"string\"\n},\n\"hyperparameter_missing\": {\n\"description\": \"What hyperparameters are missing to improve the results? What could be changed that is not exposed via hyperparameters?\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"feedback\",\n\"evaluation\",\n\"hyperparameter_suggestion\",\n\"hyperparameter_missing\"\n]\n}\n}\n```\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"task_run\": {\n\"$ref\": \"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\"\n}\n},\n\"required\": [\n\"task_run\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"$ref\": \"TaskReflection\"\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"task_run\": {\n\"task_parameters\": {\n\"domain\": \"comedy\",\n\"n\": 2\n},\n\"hyperparameters\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"LLMStructuredPrompt_query\": {\n\"json_dumps_kwargs\": {\n\"indent\": 0\n},\n\"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n\"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n\"num_retries_on_parser_failure\": 3\n}\n}\n},\n\"all_chat_chains\": [],\n\"return_value\": [\n\"The role of humor in reducing stress and anxiety\",\n\"The evolution of comedy in modern society\"\n],\n\"exception\": null\n}\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n  \"return_value\": {\n    \"feedback\": \"The generated essay topics are relevant to the comedy domain and satisfy the task description and parameters. The content seems to be derived from the given inputs and does not require any additional information from the all_chains and all_prompts fields.\",\n    \"evaluation\": \"The output is satisfying as it provides two essay topics related to the comedy domain. There is nothing wrong or missing in the output.\",\n    \"hyperparameter_suggestion\": \"The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.\",\n    \"hyperparameter_missing\": \"There are no missing hyperparameters that need to be added for this task. The current hyperparameters seem to be sufficient for generating essay topics.\"\n  }\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "reflect_on_task_run",
+     "event_id": 11,
+     "start_time_ms": 1685710212936,
+     "end_time_ms": 1685710237934,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+       "lineno": 325,
+       "function": "__call__",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168d74b90>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "args": [
+        {
+         "task_parameters": {
+          "domain": "drama",
+          "n": 2
+         },
+         "hyperparameters": {
+          "blackboard_pagi_prompt_optimizer_llm_function": {
+           "LLMStructuredPrompt_query": {
+            "json_dumps_kwargs": {
+             "indent": 0
+            },
+            "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+            "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+            "num_retries_on_parser_failure": 3
+           }
+          }
+         },
+         "all_chat_chains": [],
+         "return_value": [
+          "The role of women in Shakespearean drama",
+          "The use of symbolism in modern drama"
+         ],
+         "exception": null
+        }
+       ]
+      },
+      "result": {
+       "feedback": "The generated essay topics are relevant to the domain of drama and satisfy the task description and parameters. The content is appropriate and does not require any information from the all_chains and all_prompts fields.",
+       "evaluation": "The output is satisfying as it provides two essay topics related to the domain of drama. There is nothing wrong or missing in the output.",
+       "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for num_retries_on_parser_failure to see if it affects the quality of the generated topics.",
+       "hyperparameter_missing": "No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating relevant essay topics."
+      }
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 12,
+       "start_time_ms": 1685710212937,
+       "end_time_ms": 1685710237932,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+         "lineno": 325,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "task_run": {
+          "task_parameters": {
+           "domain": "drama",
+           "n": 2
+          },
+          "hyperparameters": {
+           "blackboard_pagi_prompt_optimizer_llm_function": {
+            "LLMStructuredPrompt_query": {
+             "json_dumps_kwargs": {
+              "indent": 0
+             },
+             "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+             "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+             "num_retries_on_parser_failure": 3
+            }
+           }
+          },
+          "all_chat_chains": [],
+          "return_value": [
+           "The role of women in Shakespearean drama",
+           "The use of symbolism in modern drama"
+          ],
+          "exception": null
+         }
+        },
+        "result": {
+         "feedback": "The generated essay topics are relevant to the domain of drama and satisfy the task description and parameters. The content is appropriate and does not require any information from the all_chains and all_prompts fields.",
+         "evaluation": "The output is satisfying as it provides two essay topics related to the domain of drama. There is nothing wrong or missing in the output.",
+         "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for num_retries_on_parser_failure to see if it affects the quality of the generated topics.",
+         "hyperparameter_missing": "No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating relevant essay topics."
+        }
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 13,
+         "start_time_ms": 1685710212938,
+         "end_time_ms": 1685710237905,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 325,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Reflect on the results given the task parameters and hyperparameters.\n\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the schema for additional data types:\n```\n{\n\"CreateEssayTopicsInputs\": {\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n},\n\"QueryHyperparameters\": {\n\"properties\": {\n\"json_dumps_kwargs\": {\n\"type\": \"object\"\n},\n\"additional_definitions_prompt_template\": {\n\"type\": \"string\"\n},\n\"llm_structured_prompt_template\": {\n\"description\": \"The general-purpose prompt for the structured prompt execution. It tells the LLM what to do and how to read function arguments and structure return values. \",\n\"type\": \"string\"\n},\n\"num_retries_on_parser_failure\": {\n\"type\": \"integer\"\n}\n}\n},\n\"blackboard_pagi_prompt_optimizer_llm_functionModule\": {\n\"properties\": {\n\"LLMStructuredPrompt_query\": {\n\"allOf\": [\n{\n\"$ref\": \"QueryHyperparameters\"\n}\n]\n}\n}\n},\n\"Hyperparameters\": {\n\"properties\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"allOf\": [\n{\n\"$ref\": \"blackboard_pagi_prompt_optimizer_llm_functionModule\"\n}\n]\n}\n}\n},\n\"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\": {\n\"description\": \"The task run. This is the 'data' we use to optimize the hyperparameters.\",\n\"properties\": {\n\"task_parameters\": {\n\"description\": \"The task parameters.\",\n\"allOf\": [\n{\n\"$ref\": \"CreateEssayTopicsInputs\"\n}\n]\n},\n\"hyperparameters\": {\n\"description\": \"The hyperparameters used for the task. We optimize these.\",\n\"allOf\": [\n{\n\"$ref\": \"Hyperparameters\"\n}\n]\n},\n\"all_chat_chains\": {\n\"description\": \"The chat chains from the task execution.\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"object\"\n}\n},\n\"return_value\": {\n\"description\": \"The results of the task. (None for exceptions/failure.)\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n},\n\"exception\": {\n\"description\": \"Exception that occurred during the task execution.\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"task_parameters\",\n\"hyperparameters\",\n\"all_chat_chains\",\n\"return_value\",\n\"exception\"\n]\n},\n\"TaskReflection\": {\n\"description\": \"The reflections on the task.\\n\\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\",\n\"properties\": {\n\"feedback\": {\n\"description\": \"Only look at the final results field. Does its content satisfy the task description and task parameters? Does it contain all the relevant information from the all_chains and all_prompts fields? What could be improved in the results?\",\n\"type\": \"string\"\n},\n\"evaluation\": {\n\"description\": \"The evaluation of the outputs given the task. Is the output satisfying? What is wrong? What is missing?\",\n\"type\": \"string\"\n},\n\"hyperparameter_suggestion\": {\n\"description\": \"How we want to change the hyperparameters to improve the results. What could we try to change?\",\n\"type\": \"string\"\n},\n\"hyperparameter_missing\": {\n\"description\": \"What hyperparameters are missing to improve the results? What could be changed that is not exposed via hyperparameters?\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"feedback\",\n\"evaluation\",\n\"hyperparameter_suggestion\",\n\"hyperparameter_missing\"\n]\n}\n}\n```\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"task_run\": {\n\"$ref\": \"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\"\n}\n},\n\"required\": [\n\"task_run\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"$ref\": \"TaskReflection\"\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"task_run\": {\n\"task_parameters\": {\n\"domain\": \"drama\",\n\"n\": 2\n},\n\"hyperparameters\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"LLMStructuredPrompt_query\": {\n\"json_dumps_kwargs\": {\n\"indent\": 0\n},\n\"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n\"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n\"num_retries_on_parser_failure\": 3\n}\n}\n},\n\"all_chat_chains\": [],\n\"return_value\": [\n\"The role of women in Shakespearean drama\",\n\"The use of symbolism in modern drama\"\n],\n\"exception\": null\n}\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n  \"return_value\": {\n    \"feedback\": \"The generated essay topics are relevant to the domain of drama and satisfy the task description and parameters. The content is appropriate and does not require any information from the all_chains and all_prompts fields.\",\n    \"evaluation\": \"The output is satisfying as it provides two essay topics related to the domain of drama. There is nothing wrong or missing in the output.\",\n    \"hyperparameter_suggestion\": \"The current hyperparameters seem to be working well for this task. However, we could experiment with different values for num_retries_on_parser_failure to see if it affects the quality of the generated topics.\",\n    \"hyperparameter_missing\": \"No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating relevant essay topics.\"\n  }\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "suggest_next_optimization_step",
+     "event_id": 14,
+     "start_time_ms": 1685710237941,
+     "end_time_ms": 1685710378655,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+       "lineno": 325,
+       "function": "__call__",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168f24d50>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "args": [
+        {
+         "older_task_summary": null,
+         "task_infos": [
+          {
+           "task_parameters": {
+            "domain": "comedy",
+            "n": 2
+           },
+           "hyperparameters": {
+            "blackboard_pagi_prompt_optimizer_llm_function": {
+             "LLMStructuredPrompt_query": {
+              "json_dumps_kwargs": {
+               "indent": 0
+              },
+              "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+              "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+              "num_retries_on_parser_failure": 3
+             }
+            }
+           },
+           "reflection": {
+            "feedback": "The generated essay topics are relevant to the comedy domain and satisfy the task description and parameters. The content seems to be derived from the given inputs and does not require any additional information from the all_chains and all_prompts fields.",
+            "evaluation": "The output is satisfying as it provides two essay topics related to the comedy domain. There is nothing wrong or missing in the output.",
+            "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+            "hyperparameter_missing": "There are no missing hyperparameters that need to be added for this task. The current hyperparameters seem to be sufficient for generating essay topics."
+           }
+          },
+          {
+           "task_parameters": {
+            "domain": "drama",
+            "n": 2
+           },
+           "hyperparameters": {
+            "blackboard_pagi_prompt_optimizer_llm_function": {
+             "LLMStructuredPrompt_query": {
+              "json_dumps_kwargs": {
+               "indent": 0
+              },
+              "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+              "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+              "num_retries_on_parser_failure": 3
+             }
+            }
+           },
+           "reflection": {
+            "feedback": "The generated essay topics are relevant to the domain of drama and satisfy the task description and parameters. The content is appropriate and does not require any information from the all_chains and all_prompts fields.",
+            "evaluation": "The output is satisfying as it provides two essay topics related to the domain of drama. There is nothing wrong or missing in the output.",
+            "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for num_retries_on_parser_failure to see if it affects the quality of the generated topics.",
+            "hyperparameter_missing": "No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating relevant essay topics."
+           }
+          }
+         ],
+         "best_hyperparameters": {
+          "blackboard_pagi_prompt_optimizer_llm_function": {
+           "LLMStructuredPrompt_query": {
+            "json_dumps_kwargs": {
+             "indent": 0
+            },
+            "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+            "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+            "num_retries_on_parser_failure": 3
+           }
+          }
+         }
+        }
+       ]
+      },
+      "result": {
+       "best_hyperparameters": {
+        "blackboard_pagi_prompt_optimizer_llm_function": {
+         "LLMStructuredPrompt_query": {
+          "json_dumps_kwargs": {
+           "indent": 0
+          },
+          "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+          "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+          "num_retries_on_parser_failure": 4
+         }
+        }
+       },
+       "suggestion": "Based on the reflections, the current hyperparameters seem to be working well for generating essay topics. However, we can experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+       "task_parameters_suggestions": [
+        {
+         "domain": "science fiction",
+         "n": 2
+        },
+        {
+         "domain": "history",
+         "n": 2
+        }
+       ],
+       "hyperparameter_suggestions": [
+        {
+         "blackboard_pagi_prompt_optimizer_llm_function": {
+          "LLMStructuredPrompt_query": {
+           "json_dumps_kwargs": {
+            "indent": 0
+           },
+           "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+           "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+           "num_retries_on_parser_failure": 4
+          }
+         }
+        },
+        {
+         "blackboard_pagi_prompt_optimizer_llm_function": {
+          "LLMStructuredPrompt_query": {
+           "json_dumps_kwargs": {
+            "indent": 0
+           },
+           "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+           "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+           "num_retries_on_parser_failure": 5
+          }
+         }
+        }
+       ]
+      }
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 15,
+       "start_time_ms": 1685710237943,
+       "end_time_ms": 1685710378651,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+         "lineno": 325,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "optimization_info": {
+          "older_task_summary": null,
+          "task_infos": [
+           {
+            "task_parameters": {
+             "domain": "comedy",
+             "n": 2
+            },
+            "hyperparameters": {
+             "blackboard_pagi_prompt_optimizer_llm_function": {
+              "LLMStructuredPrompt_query": {
+               "json_dumps_kwargs": {
+                "indent": 0
+               },
+               "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+               "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+               "num_retries_on_parser_failure": 3
+              }
+             }
+            },
+            "reflection": {
+             "feedback": "The generated essay topics are relevant to the comedy domain and satisfy the task description and parameters. The content seems to be derived from the given inputs and does not require any additional information from the all_chains and all_prompts fields.",
+             "evaluation": "The output is satisfying as it provides two essay topics related to the comedy domain. There is nothing wrong or missing in the output.",
+             "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+             "hyperparameter_missing": "There are no missing hyperparameters that need to be added for this task. The current hyperparameters seem to be sufficient for generating essay topics."
+            }
+           },
+           {
+            "task_parameters": {
+             "domain": "drama",
+             "n": 2
+            },
+            "hyperparameters": {
+             "blackboard_pagi_prompt_optimizer_llm_function": {
+              "LLMStructuredPrompt_query": {
+               "json_dumps_kwargs": {
+                "indent": 0
+               },
+               "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+               "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+               "num_retries_on_parser_failure": 3
+              }
+             }
+            },
+            "reflection": {
+             "feedback": "The generated essay topics are relevant to the domain of drama and satisfy the task description and parameters. The content is appropriate and does not require any information from the all_chains and all_prompts fields.",
+             "evaluation": "The output is satisfying as it provides two essay topics related to the domain of drama. There is nothing wrong or missing in the output.",
+             "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for num_retries_on_parser_failure to see if it affects the quality of the generated topics.",
+             "hyperparameter_missing": "No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating relevant essay topics."
+            }
+           }
+          ],
+          "best_hyperparameters": {
+           "blackboard_pagi_prompt_optimizer_llm_function": {
+            "LLMStructuredPrompt_query": {
+             "json_dumps_kwargs": {
+              "indent": 0
+             },
+             "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+             "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+             "num_retries_on_parser_failure": 3
+            }
+           }
+          }
+         }
+        },
+        "result": {
+         "best_hyperparameters": {
+          "blackboard_pagi_prompt_optimizer_llm_function": {
+           "LLMStructuredPrompt_query": {
+            "json_dumps_kwargs": {
+             "indent": 0
+            },
+            "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+            "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+            "num_retries_on_parser_failure": 4
+           }
+          }
+         },
+         "suggestion": "Based on the reflections, the current hyperparameters seem to be working well for generating essay topics. However, we can experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+         "task_parameters_suggestions": [
+          {
+           "domain": "science fiction",
+           "n": 2
+          },
+          {
+           "domain": "history",
+           "n": 2
+          }
+         ],
+         "hyperparameter_suggestions": [
+          {
+           "blackboard_pagi_prompt_optimizer_llm_function": {
+            "LLMStructuredPrompt_query": {
+             "json_dumps_kwargs": {
+              "indent": 0
+             },
+             "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+             "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+             "num_retries_on_parser_failure": 4
+            }
+           }
+          },
+          {
+           "blackboard_pagi_prompt_optimizer_llm_function": {
+            "LLMStructuredPrompt_query": {
+             "json_dumps_kwargs": {
+              "indent": 0
+             },
+             "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+             "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+             "num_retries_on_parser_failure": 5
+            }
+           }
+          }
+         ]
+        }
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 16,
+         "start_time_ms": 1685710237945,
+         "end_time_ms": 1685710378631,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 325,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Suggest the next optimization step.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the schema for additional data types:\n```\n{\n\"CreateEssayTopicsInputs\": {\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n},\n\"QueryHyperparameters\": {\n\"properties\": {\n\"json_dumps_kwargs\": {\n\"type\": \"object\"\n},\n\"additional_definitions_prompt_template\": {\n\"type\": \"string\"\n},\n\"llm_structured_prompt_template\": {\n\"description\": \"The general-purpose prompt for the structured prompt execution. It tells the LLM what to do and how to read function arguments and structure return values. \",\n\"type\": \"string\"\n},\n\"num_retries_on_parser_failure\": {\n\"type\": \"integer\"\n}\n}\n},\n\"blackboard_pagi_prompt_optimizer_llm_functionModule\": {\n\"properties\": {\n\"LLMStructuredPrompt_query\": {\n\"allOf\": [\n{\n\"$ref\": \"QueryHyperparameters\"\n}\n]\n}\n}\n},\n\"Hyperparameters\": {\n\"properties\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"allOf\": [\n{\n\"$ref\": \"blackboard_pagi_prompt_optimizer_llm_functionModule\"\n}\n]\n}\n}\n},\n\"TaskReflection\": {\n\"description\": \"The reflections on the task.\\n\\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\",\n\"properties\": {\n\"feedback\": {\n\"description\": \"Only look at the final results field. Does its content satisfy the task description and task parameters? Does it contain all the relevant information from the all_chains and all_prompts fields? What could be improved in the results?\",\n\"type\": \"string\"\n},\n\"evaluation\": {\n\"description\": \"The evaluation of the outputs given the task. Is the output satisfying? What is wrong? What is missing?\",\n\"type\": \"string\"\n},\n\"hyperparameter_suggestion\": {\n\"description\": \"How we want to change the hyperparameters to improve the results. What could we try to change?\",\n\"type\": \"string\"\n},\n\"hyperparameter_missing\": {\n\"description\": \"What hyperparameters are missing to improve the results? What could be changed that is not exposed via hyperparameters?\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"feedback\",\n\"evaluation\",\n\"hyperparameter_suggestion\",\n\"hyperparameter_missing\"\n]\n},\n\"TaskInfo_CreateEssayTopicsInputs__list_str___Hyperparameters_\": {\n\"description\": \"The task run and the reflection on the experiment.\",\n\"properties\": {\n\"task_parameters\": {\n\"description\": \"The task parameters.\",\n\"allOf\": [\n{\n\"$ref\": \"CreateEssayTopicsInputs\"\n}\n]\n},\n\"hyperparameters\": {\n\"description\": \"The hyperparameters used for the task. We optimize these.\",\n\"allOf\": [\n{\n\"$ref\": \"Hyperparameters\"\n}\n]\n},\n\"reflection\": {\n\"description\": \"The reflection on the task.\",\n\"allOf\": [\n{\n\"$ref\": \"TaskReflection\"\n}\n]\n}\n},\n\"required\": [\n\"task_parameters\",\n\"hyperparameters\",\n\"reflection\"\n]\n},\n\"OptimizationInfo_CreateEssayTopicsInputs__list_str___Hyperparameters_\": {\n\"description\": \"The optimization information. This is the data we use to optimize the hyperparameters.\",\n\"properties\": {\n\"older_task_summary\": {\n\"description\": \"A summary of previous experiments and the proposed changes with the goal of avoiding trying the same changes repeatedly.\",\n\"type\": \"string\"\n},\n\"task_infos\": {\n\"description\": \"The most recent tasks we have run and our reflections on them.\",\n\"type\": \"array\",\n\"items\": {\n\"$ref\": \"TaskInfo_CreateEssayTopicsInputs__list_str___Hyperparameters_\"\n}\n},\n\"best_hyperparameters\": {\n\"description\": \"The best hyperparameters we have found so far.\",\n\"allOf\": [\n{\n\"$ref\": \"Hyperparameters\"\n}\n]\n}\n},\n\"required\": [\n\"task_infos\",\n\"best_hyperparameters\"\n]\n},\n\"OptimizationStep_CreateEssayTopicsInputs__list_str___Hyperparameters_\": {\n\"description\": \"The next optimization steps. New hyperparameters we want to try given the previous experiments and\\nnew task parameters we want to evaluate on given the previous experiments.\",\n\"properties\": {\n\"best_hyperparameters\": {\n\"description\": \"The best hyperparameters we have found so far given task_infos and history.\",\n\"allOf\": [\n{\n\"$ref\": \"Hyperparameters\"\n}\n]\n},\n\"suggestion\": {\n\"description\": \"The suggestions for the next experiments. What could we try to change?We will try several tasks next and several sets of hyperparameters. Let's think step by step.\",\n\"type\": \"string\"\n},\n\"task_parameters_suggestions\": {\n\"description\": \"The task parameters we want to try next.\",\n\"hint_min_items\": 1,\n\"hint_max_items\": 4,\n\"type\": \"array\",\n\"items\": {\n\"$ref\": \"CreateEssayTopicsInputs\"\n}\n},\n\"hyperparameter_suggestions\": {\n\"description\": \"The hyperparameters we want to try next.\",\n\"hint_min_items\": 1,\n\"hint_max_items\": 2,\n\"type\": \"array\",\n\"items\": {\n\"$ref\": \"Hyperparameters\"\n}\n}\n},\n\"required\": [\n\"best_hyperparameters\",\n\"suggestion\",\n\"task_parameters_suggestions\",\n\"hyperparameter_suggestions\"\n]\n}\n}\n```\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"optimization_info\": {\n\"$ref\": \"OptimizationInfo_CreateEssayTopicsInputs__list_str___Hyperparameters_\"\n}\n},\n\"required\": [\n\"optimization_info\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"$ref\": \"OptimizationStep_CreateEssayTopicsInputs__list_str___Hyperparameters_\"\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"optimization_info\": {\n\"older_task_summary\": null,\n\"task_infos\": [\n{\n\"task_parameters\": {\n\"domain\": \"comedy\",\n\"n\": 2\n},\n\"hyperparameters\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"LLMStructuredPrompt_query\": {\n\"json_dumps_kwargs\": {\n\"indent\": 0\n},\n\"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n\"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n\"num_retries_on_parser_failure\": 3\n}\n}\n},\n\"reflection\": {\n\"feedback\": \"The generated essay topics are relevant to the comedy domain and satisfy the task description and parameters. The content seems to be derived from the given inputs and does not require any additional information from the all_chains and all_prompts fields.\",\n\"evaluation\": \"The output is satisfying as it provides two essay topics related to the comedy domain. There is nothing wrong or missing in the output.\",\n\"hyperparameter_suggestion\": \"The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.\",\n\"hyperparameter_missing\": \"There are no missing hyperparameters that need to be added for this task. The current hyperparameters seem to be sufficient for generating essay topics.\"\n}\n},\n{\n\"task_parameters\": {\n\"domain\": \"drama\",\n\"n\": 2\n},\n\"hyperparameters\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"LLMStructuredPrompt_query\": {\n\"json_dumps_kwargs\": {\n\"indent\": 0\n},\n\"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n\"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n\"num_retries_on_parser_failure\": 3\n}\n}\n},\n\"reflection\": {\n\"feedback\": \"The generated essay topics are relevant to the domain of drama and satisfy the task description and parameters. The content is appropriate and does not require any information from the all_chains and all_prompts fields.\",\n\"evaluation\": \"The output is satisfying as it provides two essay topics related to the domain of drama. There is nothing wrong or missing in the output.\",\n\"hyperparameter_suggestion\": \"The current hyperparameters seem to be working well for this task. However, we could experiment with different values for num_retries_on_parser_failure to see if it affects the quality of the generated topics.\",\n\"hyperparameter_missing\": \"No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating relevant essay topics.\"\n}\n}\n],\n\"best_hyperparameters\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"LLMStructuredPrompt_query\": {\n\"json_dumps_kwargs\": {\n\"indent\": 0\n},\n\"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n\"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n\"num_retries_on_parser_failure\": 3\n}\n}\n}\n}\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n  \"return_value\": {\n    \"best_hyperparameters\": {\n      \"blackboard_pagi_prompt_optimizer_llm_function\": {\n        \"LLMStructuredPrompt_query\": {\n          \"json_dumps_kwargs\": {\n            \"indent\": 0\n          },\n          \"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n          \"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n          \"num_retries_on_parser_failure\": 4\n        }\n      }\n    },\n    \"suggestion\": \"Based on the reflections, the current hyperparameters seem to be working well for generating essay topics. However, we can experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.\",\n    \"task_parameters_suggestions\": [\n      {\n        \"domain\": \"science fiction\",\n        \"n\": 2\n      },\n      {\n        \"domain\": \"history\",\n        \"n\": 2\n      }\n    ],\n    \"hyperparameter_suggestions\": [\n      {\n        \"blackboard_pagi_prompt_optimizer_llm_function\": {\n          \"LLMStructuredPrompt_query\": {\n            \"json_dumps_kwargs\": {\n              \"indent\": 0\n            },\n            \"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n            \"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n            \"num_retries_on_parser_failure\": 4\n          }\n        }\n      },\n      {\n        \"blackboard_pagi_prompt_optimizer_llm_function\": {\n          \"LLMStructuredPrompt_query\": {\n            \"json_dumps_kwargs\": {\n              \"indent\": 0\n            },\n            \"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n            \"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n            \"num_retries_on_parser_failure\": 5\n          }\n        }\n      }\n    ]\n  }\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "create_essay_topics",
+     "event_id": 17,
+     "start_time_ms": 1685710378659,
+     "end_time_ms": 1685710382853,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.llm_function",
+       "lineno": 729,
+       "function": "explicit",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168f25510>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "kwargs": {
+        "domain": "science fiction",
+        "n": 2
+       }
+      },
+      "result": [
+       "The role of artificial intelligence in science fiction",
+       "Exploring the theme of dystopia in science fiction"
+      ]
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 18,
+       "start_time_ms": 1685710378660,
+       "end_time_ms": 1685710382849,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 729,
+         "function": "explicit",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "domain": "science fiction",
+         "n": 2
+        },
+        "result": [
+         "The role of artificial intelligence in science fiction",
+         "Exploring the theme of dystopia in science fiction"
+        ]
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 19,
+         "start_time_ms": 1685710378661,
+         "end_time_ms": 1685710382827,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 328,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Create a list of essay topics.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"domain\": \"science fiction\",\n\"n\": 2\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n\"return_value\": [\n\"The role of artificial intelligence in science fiction\",\n\"Exploring the theme of dystopia in science fiction\"\n]\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "reflect_on_task_run",
+     "event_id": 20,
+     "start_time_ms": 1685710382859,
+     "end_time_ms": 1685710406596,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+       "lineno": 325,
+       "function": "__call__",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168d74b90>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "args": [
+        {
+         "task_parameters": {
+          "domain": "science fiction",
+          "n": 2
+         },
+         "hyperparameters": {
+          "blackboard_pagi_prompt_optimizer_llm_function": {
+           "LLMStructuredPrompt_query": {
+            "json_dumps_kwargs": {
+             "indent": 0
+            },
+            "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+            "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+            "num_retries_on_parser_failure": 4
+           }
+          }
+         },
+         "all_chat_chains": [],
+         "return_value": [
+          "The role of artificial intelligence in science fiction",
+          "Exploring the theme of dystopia in science fiction"
+         ],
+         "exception": null
+        }
+       ]
+      },
+      "result": {
+       "feedback": "The generated essay topics are relevant to the domain of science fiction and satisfy the task description and parameters. The content of the final results field is appropriate and contains relevant information.",
+       "evaluation": "The output is satisfying, as it provides two essay topics related to the science fiction domain. There is nothing wrong or missing in the output.",
+       "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+       "hyperparameter_missing": "No hyperparameters appear to be missing for this task, as the current set of hyperparameters produced satisfactory results."
+      }
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 21,
+       "start_time_ms": 1685710382860,
+       "end_time_ms": 1685710406589,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+         "lineno": 325,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "task_run": {
+          "task_parameters": {
+           "domain": "science fiction",
+           "n": 2
+          },
+          "hyperparameters": {
+           "blackboard_pagi_prompt_optimizer_llm_function": {
+            "LLMStructuredPrompt_query": {
+             "json_dumps_kwargs": {
+              "indent": 0
+             },
+             "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+             "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+             "num_retries_on_parser_failure": 4
+            }
+           }
+          },
+          "all_chat_chains": [],
+          "return_value": [
+           "The role of artificial intelligence in science fiction",
+           "Exploring the theme of dystopia in science fiction"
+          ],
+          "exception": null
+         }
+        },
+        "result": {
+         "feedback": "The generated essay topics are relevant to the domain of science fiction and satisfy the task description and parameters. The content of the final results field is appropriate and contains relevant information.",
+         "evaluation": "The output is satisfying, as it provides two essay topics related to the science fiction domain. There is nothing wrong or missing in the output.",
+         "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+         "hyperparameter_missing": "No hyperparameters appear to be missing for this task, as the current set of hyperparameters produced satisfactory results."
+        }
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 22,
+         "start_time_ms": 1685710382861,
+         "end_time_ms": 1685710406546,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 325,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Reflect on the results given the task parameters and hyperparameters.\n\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the schema for additional data types:\n```\n{\n\"CreateEssayTopicsInputs\": {\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n},\n\"QueryHyperparameters\": {\n\"properties\": {\n\"json_dumps_kwargs\": {\n\"type\": \"object\"\n},\n\"additional_definitions_prompt_template\": {\n\"type\": \"string\"\n},\n\"llm_structured_prompt_template\": {\n\"description\": \"The general-purpose prompt for the structured prompt execution. It tells the LLM what to do and how to read function arguments and structure return values. \",\n\"type\": \"string\"\n},\n\"num_retries_on_parser_failure\": {\n\"type\": \"integer\"\n}\n}\n},\n\"blackboard_pagi_prompt_optimizer_llm_functionModule\": {\n\"properties\": {\n\"LLMStructuredPrompt_query\": {\n\"allOf\": [\n{\n\"$ref\": \"QueryHyperparameters\"\n}\n]\n}\n}\n},\n\"Hyperparameters\": {\n\"properties\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"allOf\": [\n{\n\"$ref\": \"blackboard_pagi_prompt_optimizer_llm_functionModule\"\n}\n]\n}\n}\n},\n\"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\": {\n\"description\": \"The task run. This is the 'data' we use to optimize the hyperparameters.\",\n\"properties\": {\n\"task_parameters\": {\n\"description\": \"The task parameters.\",\n\"allOf\": [\n{\n\"$ref\": \"CreateEssayTopicsInputs\"\n}\n]\n},\n\"hyperparameters\": {\n\"description\": \"The hyperparameters used for the task. We optimize these.\",\n\"allOf\": [\n{\n\"$ref\": \"Hyperparameters\"\n}\n]\n},\n\"all_chat_chains\": {\n\"description\": \"The chat chains from the task execution.\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"object\"\n}\n},\n\"return_value\": {\n\"description\": \"The results of the task. (None for exceptions/failure.)\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n},\n\"exception\": {\n\"description\": \"Exception that occurred during the task execution.\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"task_parameters\",\n\"hyperparameters\",\n\"all_chat_chains\",\n\"return_value\",\n\"exception\"\n]\n},\n\"TaskReflection\": {\n\"description\": \"The reflections on the task.\\n\\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\",\n\"properties\": {\n\"feedback\": {\n\"description\": \"Only look at the final results field. Does its content satisfy the task description and task parameters? Does it contain all the relevant information from the all_chains and all_prompts fields? What could be improved in the results?\",\n\"type\": \"string\"\n},\n\"evaluation\": {\n\"description\": \"The evaluation of the outputs given the task. Is the output satisfying? What is wrong? What is missing?\",\n\"type\": \"string\"\n},\n\"hyperparameter_suggestion\": {\n\"description\": \"How we want to change the hyperparameters to improve the results. What could we try to change?\",\n\"type\": \"string\"\n},\n\"hyperparameter_missing\": {\n\"description\": \"What hyperparameters are missing to improve the results? What could be changed that is not exposed via hyperparameters?\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"feedback\",\n\"evaluation\",\n\"hyperparameter_suggestion\",\n\"hyperparameter_missing\"\n]\n}\n}\n```\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"task_run\": {\n\"$ref\": \"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\"\n}\n},\n\"required\": [\n\"task_run\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"$ref\": \"TaskReflection\"\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"task_run\": {\n\"task_parameters\": {\n\"domain\": \"science fiction\",\n\"n\": 2\n},\n\"hyperparameters\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"LLMStructuredPrompt_query\": {\n\"json_dumps_kwargs\": {\n\"indent\": 0\n},\n\"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n\"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n\"num_retries_on_parser_failure\": 4\n}\n}\n},\n\"all_chat_chains\": [],\n\"return_value\": [\n\"The role of artificial intelligence in science fiction\",\n\"Exploring the theme of dystopia in science fiction\"\n],\n\"exception\": null\n}\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n  \"return_value\": {\n    \"feedback\": \"The generated essay topics are relevant to the domain of science fiction and satisfy the task description and parameters. The content of the final results field is appropriate and contains relevant information.\",\n    \"evaluation\": \"The output is satisfying, as it provides two essay topics related to the science fiction domain. There is nothing wrong or missing in the output.\",\n    \"hyperparameter_suggestion\": \"The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.\",\n    \"hyperparameter_missing\": \"No hyperparameters appear to be missing for this task, as the current set of hyperparameters produced satisfactory results.\"\n  }\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "create_essay_topics",
+     "event_id": 23,
+     "start_time_ms": 1685710406602,
+     "end_time_ms": 1685710410829,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.llm_function",
+       "lineno": 729,
+       "function": "explicit",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168f25510>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "kwargs": {
+        "domain": "science fiction",
+        "n": 2
+       }
+      },
+      "result": [
+       "The impact of artificial intelligence on science fiction",
+       "The role of time travel in science fiction"
+      ]
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 24,
+       "start_time_ms": 1685710406602,
+       "end_time_ms": 1685710410819,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 729,
+         "function": "explicit",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "domain": "science fiction",
+         "n": 2
+        },
+        "result": [
+         "The impact of artificial intelligence on science fiction",
+         "The role of time travel in science fiction"
+        ]
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 25,
+         "start_time_ms": 1685710406603,
+         "end_time_ms": 1685710410802,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 328,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Create a list of essay topics.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"domain\": \"science fiction\",\n\"n\": 2\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n\"return_value\": [\n\"The impact of artificial intelligence on science fiction\",\n\"The role of time travel in science fiction\"\n]\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "reflect_on_task_run",
+     "event_id": 26,
+     "start_time_ms": 1685710410840,
+     "end_time_ms": 1685710432304,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+       "lineno": 325,
+       "function": "__call__",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168d74b90>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "args": [
+        {
+         "task_parameters": {
+          "domain": "science fiction",
+          "n": 2
+         },
+         "hyperparameters": {
+          "blackboard_pagi_prompt_optimizer_llm_function": {
+           "LLMStructuredPrompt_query": {
+            "json_dumps_kwargs": {
+             "indent": 0
+            },
+            "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+            "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+            "num_retries_on_parser_failure": 5
+           }
+          }
+         },
+         "all_chat_chains": [],
+         "return_value": [
+          "The impact of artificial intelligence on science fiction",
+          "The role of time travel in science fiction"
+         ],
+         "exception": null
+        }
+       ]
+      },
+      "result": {
+       "feedback": "The generated essay topics are relevant to the domain of science fiction and satisfy the task description and parameters. The content of the final results field is appropriate and contains relevant information.",
+       "evaluation": "The output is satisfying as it provides two essay topics related to the domain of science fiction. There is nothing wrong or missing in the output.",
+       "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+       "hyperparameter_missing": "No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating essay topics."
+      }
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 27,
+       "start_time_ms": 1685710410842,
+       "end_time_ms": 1685710432299,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+         "lineno": 325,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "task_run": {
+          "task_parameters": {
+           "domain": "science fiction",
+           "n": 2
+          },
+          "hyperparameters": {
+           "blackboard_pagi_prompt_optimizer_llm_function": {
+            "LLMStructuredPrompt_query": {
+             "json_dumps_kwargs": {
+              "indent": 0
+             },
+             "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+             "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+             "num_retries_on_parser_failure": 5
+            }
+           }
+          },
+          "all_chat_chains": [],
+          "return_value": [
+           "The impact of artificial intelligence on science fiction",
+           "The role of time travel in science fiction"
+          ],
+          "exception": null
+         }
+        },
+        "result": {
+         "feedback": "The generated essay topics are relevant to the domain of science fiction and satisfy the task description and parameters. The content of the final results field is appropriate and contains relevant information.",
+         "evaluation": "The output is satisfying as it provides two essay topics related to the domain of science fiction. There is nothing wrong or missing in the output.",
+         "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+         "hyperparameter_missing": "No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating essay topics."
+        }
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 28,
+         "start_time_ms": 1685710410843,
+         "end_time_ms": 1685710432287,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 325,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Reflect on the results given the task parameters and hyperparameters.\n\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the schema for additional data types:\n```\n{\n\"CreateEssayTopicsInputs\": {\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n},\n\"QueryHyperparameters\": {\n\"properties\": {\n\"json_dumps_kwargs\": {\n\"type\": \"object\"\n},\n\"additional_definitions_prompt_template\": {\n\"type\": \"string\"\n},\n\"llm_structured_prompt_template\": {\n\"description\": \"The general-purpose prompt for the structured prompt execution. It tells the LLM what to do and how to read function arguments and structure return values. \",\n\"type\": \"string\"\n},\n\"num_retries_on_parser_failure\": {\n\"type\": \"integer\"\n}\n}\n},\n\"blackboard_pagi_prompt_optimizer_llm_functionModule\": {\n\"properties\": {\n\"LLMStructuredPrompt_query\": {\n\"allOf\": [\n{\n\"$ref\": \"QueryHyperparameters\"\n}\n]\n}\n}\n},\n\"Hyperparameters\": {\n\"properties\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"allOf\": [\n{\n\"$ref\": \"blackboard_pagi_prompt_optimizer_llm_functionModule\"\n}\n]\n}\n}\n},\n\"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\": {\n\"description\": \"The task run. This is the 'data' we use to optimize the hyperparameters.\",\n\"properties\": {\n\"task_parameters\": {\n\"description\": \"The task parameters.\",\n\"allOf\": [\n{\n\"$ref\": \"CreateEssayTopicsInputs\"\n}\n]\n},\n\"hyperparameters\": {\n\"description\": \"The hyperparameters used for the task. We optimize these.\",\n\"allOf\": [\n{\n\"$ref\": \"Hyperparameters\"\n}\n]\n},\n\"all_chat_chains\": {\n\"description\": \"The chat chains from the task execution.\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"object\"\n}\n},\n\"return_value\": {\n\"description\": \"The results of the task. (None for exceptions/failure.)\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n},\n\"exception\": {\n\"description\": \"Exception that occurred during the task execution.\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"task_parameters\",\n\"hyperparameters\",\n\"all_chat_chains\",\n\"return_value\",\n\"exception\"\n]\n},\n\"TaskReflection\": {\n\"description\": \"The reflections on the task.\\n\\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\",\n\"properties\": {\n\"feedback\": {\n\"description\": \"Only look at the final results field. Does its content satisfy the task description and task parameters? Does it contain all the relevant information from the all_chains and all_prompts fields? What could be improved in the results?\",\n\"type\": \"string\"\n},\n\"evaluation\": {\n\"description\": \"The evaluation of the outputs given the task. Is the output satisfying? What is wrong? What is missing?\",\n\"type\": \"string\"\n},\n\"hyperparameter_suggestion\": {\n\"description\": \"How we want to change the hyperparameters to improve the results. What could we try to change?\",\n\"type\": \"string\"\n},\n\"hyperparameter_missing\": {\n\"description\": \"What hyperparameters are missing to improve the results? What could be changed that is not exposed via hyperparameters?\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"feedback\",\n\"evaluation\",\n\"hyperparameter_suggestion\",\n\"hyperparameter_missing\"\n]\n}\n}\n```\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"task_run\": {\n\"$ref\": \"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\"\n}\n},\n\"required\": [\n\"task_run\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"$ref\": \"TaskReflection\"\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"task_run\": {\n\"task_parameters\": {\n\"domain\": \"science fiction\",\n\"n\": 2\n},\n\"hyperparameters\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"LLMStructuredPrompt_query\": {\n\"json_dumps_kwargs\": {\n\"indent\": 0\n},\n\"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n\"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n\"num_retries_on_parser_failure\": 5\n}\n}\n},\n\"all_chat_chains\": [],\n\"return_value\": [\n\"The impact of artificial intelligence on science fiction\",\n\"The role of time travel in science fiction\"\n],\n\"exception\": null\n}\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n  \"return_value\": {\n    \"feedback\": \"The generated essay topics are relevant to the domain of science fiction and satisfy the task description and parameters. The content of the final results field is appropriate and contains relevant information.\",\n    \"evaluation\": \"The output is satisfying as it provides two essay topics related to the domain of science fiction. There is nothing wrong or missing in the output.\",\n    \"hyperparameter_suggestion\": \"The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.\",\n    \"hyperparameter_missing\": \"No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating essay topics.\"\n  }\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "create_essay_topics",
+     "event_id": 29,
+     "start_time_ms": 1685710432310,
+     "end_time_ms": 1685710470758,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.llm_function",
+       "lineno": 729,
+       "function": "explicit",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168f25510>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "kwargs": {
+        "domain": "history",
+        "n": 2
+       }
+      },
+      "result": [
+       "The impact of World War II on the global economy",
+       "The role of women in the American Civil War"
+      ]
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 30,
+       "start_time_ms": 1685710432310,
+       "end_time_ms": 1685710470752,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 729,
+         "function": "explicit",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "domain": "history",
+         "n": 2
+        },
+        "result": [
+         "The impact of World War II on the global economy",
+         "The role of women in the American Civil War"
+        ]
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 31,
+         "start_time_ms": 1685710432311,
+         "end_time_ms": 1685710470732,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 328,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Create a list of essay topics.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"domain\": \"history\",\n\"n\": 2\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n\"return_value\": [\n\"The impact of World War II on the global economy\",\n\"The role of women in the American Civil War\"\n]\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "reflect_on_task_run",
+     "event_id": 32,
+     "start_time_ms": 1685710470766,
+     "end_time_ms": 1685710494269,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+       "lineno": 325,
+       "function": "__call__",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168d74b90>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "args": [
+        {
+         "task_parameters": {
+          "domain": "history",
+          "n": 2
+         },
+         "hyperparameters": {
+          "blackboard_pagi_prompt_optimizer_llm_function": {
+           "LLMStructuredPrompt_query": {
+            "json_dumps_kwargs": {
+             "indent": 0
+            },
+            "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+            "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+            "num_retries_on_parser_failure": 4
+           }
+          }
+         },
+         "all_chat_chains": [],
+         "return_value": [
+          "The impact of World War II on the global economy",
+          "The role of women in the American Civil War"
+         ],
+         "exception": null
+        }
+       ]
+      },
+      "result": {
+       "feedback": "The generated essay topics are relevant to the history domain and satisfy the task description and parameters. The content is appropriate and does not require any additional information from the all_chains and all_prompts fields.",
+       "evaluation": "The output is satisfying as it provides two essay topics related to the history domain. There is nothing wrong or missing in the output.",
+       "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+       "hyperparameter_missing": "No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating relevant essay topics."
+      }
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 33,
+       "start_time_ms": 1685710470768,
+       "end_time_ms": 1685710494263,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+         "lineno": 325,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "task_run": {
+          "task_parameters": {
+           "domain": "history",
+           "n": 2
+          },
+          "hyperparameters": {
+           "blackboard_pagi_prompt_optimizer_llm_function": {
+            "LLMStructuredPrompt_query": {
+             "json_dumps_kwargs": {
+              "indent": 0
+             },
+             "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+             "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+             "num_retries_on_parser_failure": 4
+            }
+           }
+          },
+          "all_chat_chains": [],
+          "return_value": [
+           "The impact of World War II on the global economy",
+           "The role of women in the American Civil War"
+          ],
+          "exception": null
+         }
+        },
+        "result": {
+         "feedback": "The generated essay topics are relevant to the history domain and satisfy the task description and parameters. The content is appropriate and does not require any additional information from the all_chains and all_prompts fields.",
+         "evaluation": "The output is satisfying as it provides two essay topics related to the history domain. There is nothing wrong or missing in the output.",
+         "hyperparameter_suggestion": "The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.",
+         "hyperparameter_missing": "No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating relevant essay topics."
+        }
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 34,
+         "start_time_ms": 1685710470769,
+         "end_time_ms": 1685710494245,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 325,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Reflect on the results given the task parameters and hyperparameters.\n\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the schema for additional data types:\n```\n{\n\"CreateEssayTopicsInputs\": {\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n},\n\"QueryHyperparameters\": {\n\"properties\": {\n\"json_dumps_kwargs\": {\n\"type\": \"object\"\n},\n\"additional_definitions_prompt_template\": {\n\"type\": \"string\"\n},\n\"llm_structured_prompt_template\": {\n\"description\": \"The general-purpose prompt for the structured prompt execution. It tells the LLM what to do and how to read function arguments and structure return values. \",\n\"type\": \"string\"\n},\n\"num_retries_on_parser_failure\": {\n\"type\": \"integer\"\n}\n}\n},\n\"blackboard_pagi_prompt_optimizer_llm_functionModule\": {\n\"properties\": {\n\"LLMStructuredPrompt_query\": {\n\"allOf\": [\n{\n\"$ref\": \"QueryHyperparameters\"\n}\n]\n}\n}\n},\n\"Hyperparameters\": {\n\"properties\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"allOf\": [\n{\n\"$ref\": \"blackboard_pagi_prompt_optimizer_llm_functionModule\"\n}\n]\n}\n}\n},\n\"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\": {\n\"description\": \"The task run. This is the 'data' we use to optimize the hyperparameters.\",\n\"properties\": {\n\"task_parameters\": {\n\"description\": \"The task parameters.\",\n\"allOf\": [\n{\n\"$ref\": \"CreateEssayTopicsInputs\"\n}\n]\n},\n\"hyperparameters\": {\n\"description\": \"The hyperparameters used for the task. We optimize these.\",\n\"allOf\": [\n{\n\"$ref\": \"Hyperparameters\"\n}\n]\n},\n\"all_chat_chains\": {\n\"description\": \"The chat chains from the task execution.\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"object\"\n}\n},\n\"return_value\": {\n\"description\": \"The results of the task. (None for exceptions/failure.)\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n},\n\"exception\": {\n\"description\": \"Exception that occurred during the task execution.\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"task_parameters\",\n\"hyperparameters\",\n\"all_chat_chains\",\n\"return_value\",\n\"exception\"\n]\n},\n\"TaskReflection\": {\n\"description\": \"The reflections on the task.\\n\\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\",\n\"properties\": {\n\"feedback\": {\n\"description\": \"Only look at the final results field. Does its content satisfy the task description and task parameters? Does it contain all the relevant information from the all_chains and all_prompts fields? What could be improved in the results?\",\n\"type\": \"string\"\n},\n\"evaluation\": {\n\"description\": \"The evaluation of the outputs given the task. Is the output satisfying? What is wrong? What is missing?\",\n\"type\": \"string\"\n},\n\"hyperparameter_suggestion\": {\n\"description\": \"How we want to change the hyperparameters to improve the results. What could we try to change?\",\n\"type\": \"string\"\n},\n\"hyperparameter_missing\": {\n\"description\": \"What hyperparameters are missing to improve the results? What could be changed that is not exposed via hyperparameters?\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"feedback\",\n\"evaluation\",\n\"hyperparameter_suggestion\",\n\"hyperparameter_missing\"\n]\n}\n}\n```\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"task_run\": {\n\"$ref\": \"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\"\n}\n},\n\"required\": [\n\"task_run\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"$ref\": \"TaskReflection\"\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"task_run\": {\n\"task_parameters\": {\n\"domain\": \"history\",\n\"n\": 2\n},\n\"hyperparameters\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"LLMStructuredPrompt_query\": {\n\"json_dumps_kwargs\": {\n\"indent\": 0\n},\n\"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n\"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n\"num_retries_on_parser_failure\": 4\n}\n}\n},\n\"all_chat_chains\": [],\n\"return_value\": [\n\"The impact of World War II on the global economy\",\n\"The role of women in the American Civil War\"\n],\n\"exception\": null\n}\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n  \"return_value\": {\n    \"feedback\": \"The generated essay topics are relevant to the history domain and satisfy the task description and parameters. The content is appropriate and does not require any additional information from the all_chains and all_prompts fields.\",\n    \"evaluation\": \"The output is satisfying as it provides two essay topics related to the history domain. There is nothing wrong or missing in the output.\",\n    \"hyperparameter_suggestion\": \"The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.\",\n    \"hyperparameter_missing\": \"No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating relevant essay topics.\"\n  }\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "create_essay_topics",
+     "event_id": 35,
+     "start_time_ms": 1685710494276,
+     "end_time_ms": 1685710498735,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.llm_function",
+       "lineno": 729,
+       "function": "explicit",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168f25510>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "kwargs": {
+        "domain": "history",
+        "n": 2
+       }
+      },
+      "result": [
+       "The impact of the Industrial Revolution on society",
+       "The causes and consequences of World War II"
+      ]
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 36,
+       "start_time_ms": 1685710494276,
+       "end_time_ms": 1685710498727,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 729,
+         "function": "explicit",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "domain": "history",
+         "n": 2
+        },
+        "result": [
+         "The impact of the Industrial Revolution on society",
+         "The causes and consequences of World War II"
+        ]
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 37,
+         "start_time_ms": 1685710494277,
+         "end_time_ms": 1685710498704,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 328,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Create a list of essay topics.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"domain\": \"history\",\n\"n\": 2\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n\"return_value\": [\n\"The impact of the Industrial Revolution on society\",\n\"The causes and consequences of World War II\"\n]\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "CHAIN",
+     "name": "reflect_on_task_run",
+     "event_id": 38,
+     "start_time_ms": 1685710498745,
+     "end_time_ms": 1685710526998,
+     "running": false,
+     "delta_frame_infos": [
+      {
+       "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+       "lineno": 325,
+       "function": "__call__",
+       "code_context": null,
+       "index": null
+      }
+     ],
+     "properties": {
+      "arguments": {
+       "self": "<blackboard_pagi.prompt_optimizer.llm_function.LLMFunction object at 0x168d74b90>",
+       "language_model_or_chat_chain": {
+        "chat_model": {
+         "_type": "ChatOpenAI"
+        },
+        "messages": []
+       },
+       "args": [
+        {
+         "task_parameters": {
+          "domain": "history",
+          "n": 2
+         },
+         "hyperparameters": {
+          "blackboard_pagi_prompt_optimizer_llm_function": {
+           "LLMStructuredPrompt_query": {
+            "json_dumps_kwargs": {
+             "indent": 0
+            },
+            "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+            "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+            "num_retries_on_parser_failure": 5
+           }
+          }
+         },
+         "all_chat_chains": [],
+         "return_value": [
+          "The impact of the Industrial Revolution on society",
+          "The causes and consequences of World War II"
+         ],
+         "exception": null
+        }
+       ]
+      },
+      "exception": "Traceback (most recent call last):\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 536, in _make_request\n    response = conn.getresponse()\n               ^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connection.py\", line 454, in getresponse\n    httplib_response = super().getresponse()\n                       ^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/http/client.py\", line 1374, in getresponse\n    response.begin()\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/http/client.py\", line 318, in begin\n    version, status, reason = self._read_status()\n                              ^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/http/client.py\", line 279, in _read_status\n    line = str(self.fp.readline(_MAXLINE + 1), \"iso-8859-1\")\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/socket.py\", line 705, in readinto\n    return self._sock.recv_into(b)\n           ^^^^^^^^^^^^^^^^^^^^^^^\n\nTimeoutError: timed out\n\n\nThe above exception was the direct cause of the following exception:\n\n\nTraceback (most recent call last):\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/adapters.py\", line 486, in send\n    resp = conn.urlopen(\n           ^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 844, in urlopen\n    retries = retries.increment(\n              ^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/util/retry.py\", line 470, in increment\n    raise reraise(type(error), error, _stacktrace)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/util/util.py\", line 39, in reraise\n    raise value\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 790, in urlopen\n    response = self._make_request(\n               ^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 538, in _make_request\n    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 370, in _raise_timeout\n    raise ReadTimeoutError(\n\nurllib3.exceptions.ReadTimeoutError: HTTPConnectionPool(host='localhost', port=8333): Read timed out. (read timeout=0.05)\n\n\nDuring handling of the above exception, another exception occurred:\n\n\nTraceback (most recent call last):\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 195, in event_scope\n    yield\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 318, in __call__\n    result = self.__wrapped__(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/llm_function.py\", line 755, in __call__\n    return_value = llm_bound_signature.structured_prompt(language_model_or_chat_chain)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 318, in __call__\n    result = self.__wrapped__(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/llm_function.py\", line 378, in __call__\n    parsed_output = self.query(language_model_or_chat_chain, schema)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/track_hyperparameters.py\", line 325, in __call__\n    return self.__wrapped__(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/llm_function.py\", line 452, in query\n    output, chain = chain.query(prompt)\n                    ^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompts/chat_chain.py\", line 35, in query\n    reply = self.chat_model(messages)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 316, in __call__\n    with builder.event_scope(self.__wrapped_name__, properties, kind=self.__kind__, skip_frames=1):\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/contextlib.py\", line 144, in __exit__\n    next(self.gen)\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 204, in event_scope\n    handler.on_event_scope_final(self)\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/handlers/trace_viewer.py\", line 10, in on_event_scope_final\n    trace_viewer_send_trace_builder(builder, force=False)\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/tools/trace_viewer/endpoint_integration.py\", line 59, in trace_viewer_send_trace_builder\n    requests.post(url, json=payload, timeout=0.05)\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/api.py\", line 115, in post\n    return request(\"post\", url, data=data, json=json, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/api.py\", line 59, in request\n    return session.request(method=method, url=url, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/sessions.py\", line 587, in request\n    resp = self.send(prep, **send_kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/sessions.py\", line 701, in send\n    r = adapter.send(request, **kwargs)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/adapters.py\", line 532, in send\n    raise ReadTimeout(e, request=request)\n\nrequests.exceptions.ReadTimeout: HTTPConnectionPool(host='localhost', port=8333): Read timed out. (read timeout=0.05)\n"
+     },
+     "children": [
+      {
+       "kind": "CHAIN",
+       "name": "LLMStructuredPrompt",
+       "event_id": 39,
+       "start_time_ms": 1685710498746,
+       "end_time_ms": 1685710526987,
+       "running": false,
+       "delta_frame_infos": [
+        {
+         "module": "blackboard_pagi.prompt_optimizer.llm_function",
+         "lineno": 755,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.utils.tracer.trace_builder",
+         "lineno": 318,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        },
+        {
+         "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+         "lineno": 325,
+         "function": "__call__",
+         "code_context": null,
+         "index": null
+        }
+       ],
+       "properties": {
+        "arguments": {
+         "task_run": {
+          "task_parameters": {
+           "domain": "history",
+           "n": 2
+          },
+          "hyperparameters": {
+           "blackboard_pagi_prompt_optimizer_llm_function": {
+            "LLMStructuredPrompt_query": {
+             "json_dumps_kwargs": {
+              "indent": 0
+             },
+             "additional_definitions_prompt_template": "Here is the schema for additional data types:\n```\n{additional_definitions}\n```\n\n",
+             "llm_structured_prompt_template": "{docstring}\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {{\"properties\": {{\"foo\": {{\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {{\"type\": \"string\"}}}}}}, \"required\": [\"foo\"]}}}} the object {{\"foo\": [\"bar\", \"baz\"]}} is a well-formatted instance of the schema. The object {{\"properties\": {{\"foo\": [\"bar\", \"baz\"]}}}} is not well-formatted.\n\n{optional_additional_definitions_prompt}Here is the input schema:\n```\n{input_schema}\n```\n\nHere is the output schema:\n```\n{output_schema}\n```\nNow output the results for the following inputs:\n```\n{inputs}\n```",
+             "num_retries_on_parser_failure": 5
+            }
+           }
+          },
+          "all_chat_chains": [],
+          "return_value": [
+           "The impact of the Industrial Revolution on society",
+           "The causes and consequences of World War II"
+          ],
+          "exception": null
+         }
+        },
+        "exception": "Traceback (most recent call last):\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 536, in _make_request\n    response = conn.getresponse()\n               ^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connection.py\", line 454, in getresponse\n    httplib_response = super().getresponse()\n                       ^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/http/client.py\", line 1374, in getresponse\n    response.begin()\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/http/client.py\", line 318, in begin\n    version, status, reason = self._read_status()\n                              ^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/http/client.py\", line 279, in _read_status\n    line = str(self.fp.readline(_MAXLINE + 1), \"iso-8859-1\")\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/socket.py\", line 705, in readinto\n    return self._sock.recv_into(b)\n           ^^^^^^^^^^^^^^^^^^^^^^^\n\nTimeoutError: timed out\n\n\nThe above exception was the direct cause of the following exception:\n\n\nTraceback (most recent call last):\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/adapters.py\", line 486, in send\n    resp = conn.urlopen(\n           ^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 844, in urlopen\n    retries = retries.increment(\n              ^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/util/retry.py\", line 470, in increment\n    raise reraise(type(error), error, _stacktrace)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/util/util.py\", line 39, in reraise\n    raise value\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 790, in urlopen\n    response = self._make_request(\n               ^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 538, in _make_request\n    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/urllib3/connectionpool.py\", line 370, in _raise_timeout\n    raise ReadTimeoutError(\n\nurllib3.exceptions.ReadTimeoutError: HTTPConnectionPool(host='localhost', port=8333): Read timed out. (read timeout=0.05)\n\n\nDuring handling of the above exception, another exception occurred:\n\n\nTraceback (most recent call last):\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 195, in event_scope\n    yield\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 318, in __call__\n    result = self.__wrapped__(*args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/llm_function.py\", line 378, in __call__\n    parsed_output = self.query(language_model_or_chat_chain, schema)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/track_hyperparameters.py\", line 325, in __call__\n    return self.__wrapped__(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompt_optimizer/llm_function.py\", line 452, in query\n    output, chain = chain.query(prompt)\n                    ^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/prompts/chat_chain.py\", line 35, in query\n    reply = self.chat_model(messages)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 316, in __call__\n    with builder.event_scope(self.__wrapped_name__, properties, kind=self.__kind__, skip_frames=1):\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/contextlib.py\", line 144, in __exit__\n    next(self.gen)\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/trace_builder.py\", line 204, in event_scope\n    handler.on_event_scope_final(self)\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/utils/tracer/handlers/trace_viewer.py\", line 10, in on_event_scope_final\n    trace_viewer_send_trace_builder(builder, force=False)\n\n  File \"/Users/andreaskirsch/PycharmProjects/blackboard-pagi/blackboard_pagi/tools/trace_viewer/endpoint_integration.py\", line 59, in trace_viewer_send_trace_builder\n    requests.post(url, json=payload, timeout=0.05)\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/api.py\", line 115, in post\n    return request(\"post\", url, data=data, json=json, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/api.py\", line 59, in request\n    return session.request(method=method, url=url, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/sessions.py\", line 587, in request\n    resp = self.send(prep, **send_kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/sessions.py\", line 701, in send\n    r = adapter.send(request, **kwargs)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/andreaskirsch/opt/miniconda3/envs/blackboard-pagi/lib/python3.11/site-packages/requests/adapters.py\", line 532, in send\n    raise ReadTimeout(e, request=request)\n\nrequests.exceptions.ReadTimeout: HTTPConnectionPool(host='localhost', port=8333): Read timed out. (read timeout=0.05)\n"
+       },
+       "children": [
+        {
+         "kind": "LLM",
+         "name": "TrackedChatModel",
+         "event_id": 40,
+         "start_time_ms": 1685710498747,
+         "end_time_ms": 1685710526915,
+         "running": false,
+         "delta_frame_infos": [
+          {
+           "module": "blackboard_pagi.prompts.chat_chain",
+           "lineno": 35,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 452,
+           "function": "query",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.track_hyperparameters",
+           "lineno": 325,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 378,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.utils.tracer.trace_builder",
+           "lineno": 318,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          },
+          {
+           "module": "blackboard_pagi.prompt_optimizer.llm_function",
+           "lineno": 755,
+           "function": "__call__",
+           "code_context": null,
+           "index": null
+          }
+         ],
+         "properties": {
+          "arguments": {
+           "self": {
+            "_type": "ChatOpenAI"
+           },
+           "messages": [
+            {
+             "content": "Reflect on the results given the task parameters and hyperparameters.\n\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\n\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\n\nAs an example, for the schema {\"properties\": {\"foo\": {\"description\": \"a list of strings\", \"type\": \"array\", \"items\": {\"type\": \"string\"}}}, \"required\": [\"foo\"]}} the object {\"foo\": [\"bar\", \"baz\"]} is a well-formatted instance of the schema. The object {\"properties\": {\"foo\": [\"bar\", \"baz\"]}} is not well-formatted.\n\nHere is the schema for additional data types:\n```\n{\n\"CreateEssayTopicsInputs\": {\n\"properties\": {\n\"domain\": {\n\"description\": \"The domain or general area of the essay topic\",\n\"type\": \"string\"\n},\n\"n\": {\n\"description\": \"Number of topics to generate\",\n\"type\": \"integer\"\n}\n},\n\"required\": [\n\"domain\",\n\"n\"\n]\n},\n\"QueryHyperparameters\": {\n\"properties\": {\n\"json_dumps_kwargs\": {\n\"type\": \"object\"\n},\n\"additional_definitions_prompt_template\": {\n\"type\": \"string\"\n},\n\"llm_structured_prompt_template\": {\n\"description\": \"The general-purpose prompt for the structured prompt execution. It tells the LLM what to do and how to read function arguments and structure return values. \",\n\"type\": \"string\"\n},\n\"num_retries_on_parser_failure\": {\n\"type\": \"integer\"\n}\n}\n},\n\"blackboard_pagi_prompt_optimizer_llm_functionModule\": {\n\"properties\": {\n\"LLMStructuredPrompt_query\": {\n\"allOf\": [\n{\n\"$ref\": \"QueryHyperparameters\"\n}\n]\n}\n}\n},\n\"Hyperparameters\": {\n\"properties\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"allOf\": [\n{\n\"$ref\": \"blackboard_pagi_prompt_optimizer_llm_functionModule\"\n}\n]\n}\n}\n},\n\"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\": {\n\"description\": \"The task run. This is the 'data' we use to optimize the hyperparameters.\",\n\"properties\": {\n\"task_parameters\": {\n\"description\": \"The task parameters.\",\n\"allOf\": [\n{\n\"$ref\": \"CreateEssayTopicsInputs\"\n}\n]\n},\n\"hyperparameters\": {\n\"description\": \"The hyperparameters used for the task. We optimize these.\",\n\"allOf\": [\n{\n\"$ref\": \"Hyperparameters\"\n}\n]\n},\n\"all_chat_chains\": {\n\"description\": \"The chat chains from the task execution.\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"object\"\n}\n},\n\"return_value\": {\n\"description\": \"The results of the task. (None for exceptions/failure.)\",\n\"type\": \"array\",\n\"items\": {\n\"type\": \"string\"\n}\n},\n\"exception\": {\n\"description\": \"Exception that occurred during the task execution.\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"task_parameters\",\n\"hyperparameters\",\n\"all_chat_chains\",\n\"return_value\",\n\"exception\"\n]\n},\n\"TaskReflection\": {\n\"description\": \"The reflections on the task.\\n\\nThis contains the lessons we learn from each task run to come up with better hyperparameters to try.\",\n\"properties\": {\n\"feedback\": {\n\"description\": \"Only look at the final results field. Does its content satisfy the task description and task parameters? Does it contain all the relevant information from the all_chains and all_prompts fields? What could be improved in the results?\",\n\"type\": \"string\"\n},\n\"evaluation\": {\n\"description\": \"The evaluation of the outputs given the task. Is the output satisfying? What is wrong? What is missing?\",\n\"type\": \"string\"\n},\n\"hyperparameter_suggestion\": {\n\"description\": \"How we want to change the hyperparameters to improve the results. What could we try to change?\",\n\"type\": \"string\"\n},\n\"hyperparameter_missing\": {\n\"description\": \"What hyperparameters are missing to improve the results? What could be changed that is not exposed via hyperparameters?\",\n\"type\": \"string\"\n}\n},\n\"required\": [\n\"feedback\",\n\"evaluation\",\n\"hyperparameter_suggestion\",\n\"hyperparameter_missing\"\n]\n}\n}\n```\n\nHere is the input schema:\n```\n{\n\"properties\": {\n\"task_run\": {\n\"$ref\": \"TaskRun_CreateEssayTopicsInputs__list_str___Hyperparameters_\"\n}\n},\n\"required\": [\n\"task_run\"\n]\n}\n```\n\nHere is the output schema:\n```\n{\n\"properties\": {\n\"return_value\": {\n\"$ref\": \"TaskReflection\"\n}\n},\n\"required\": [\n\"return_value\"\n]\n}\n```\nNow output the results for the following inputs:\n```\n{\n\"task_run\": {\n\"task_parameters\": {\n\"domain\": \"history\",\n\"n\": 2\n},\n\"hyperparameters\": {\n\"blackboard_pagi_prompt_optimizer_llm_function\": {\n\"LLMStructuredPrompt_query\": {\n\"json_dumps_kwargs\": {\n\"indent\": 0\n},\n\"additional_definitions_prompt_template\": \"Here is the schema for additional data types:\\n```\\n{additional_definitions}\\n```\\n\\n\",\n\"llm_structured_prompt_template\": \"{docstring}\\n\\nThe input and output are formatted as a JSON interface that conforms to the JSON schemas below.\\n\\nAs an example, for the schema {{\\\"properties\\\": {{\\\"foo\\\": {{\\\"description\\\": \\\"a list of strings\\\", \\\"type\\\": \\\"array\\\", \\\"items\\\": {{\\\"type\\\": \\\"string\\\"}}}}}}, \\\"required\\\": [\\\"foo\\\"]}}}} the object {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}} is a well-formatted instance of the schema. The object {{\\\"properties\\\": {{\\\"foo\\\": [\\\"bar\\\", \\\"baz\\\"]}}}} is not well-formatted.\\n\\n{optional_additional_definitions_prompt}Here is the input schema:\\n```\\n{input_schema}\\n```\\n\\nHere is the output schema:\\n```\\n{output_schema}\\n```\\nNow output the results for the following inputs:\\n```\\n{inputs}\\n```\",\n\"num_retries_on_parser_failure\": 5\n}\n}\n},\n\"all_chat_chains\": [],\n\"return_value\": [\n\"The impact of the Industrial Revolution on society\",\n\"The causes and consequences of World War II\"\n],\n\"exception\": null\n}\n}\n```",
+             "additional_kwargs": {}
+            }
+           ]
+          },
+          "result": {
+           "content": "{\n  \"return_value\": {\n    \"feedback\": \"The generated essay topics are relevant to the history domain and satisfy the task description and parameters. The content seems to be appropriate and contains relevant information.\",\n    \"evaluation\": \"The output is satisfying as it provides two essay topics related to the history domain. There is nothing wrong or missing in the output.\",\n    \"hyperparameter_suggestion\": \"The current hyperparameters seem to be working well for this task. However, we could experiment with different values for 'num_retries_on_parser_failure' to see if it affects the quality of the generated topics.\",\n    \"hyperparameter_missing\": \"No missing hyperparameters are identified for this task. The current hyperparameters seem to be sufficient for generating essay topics.\"\n  }\n}",
+           "additional_kwargs": {}
+          }
+         },
+         "children": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "properties": {},
+ "unique_objects": {}
+}
