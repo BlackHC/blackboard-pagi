@@ -403,7 +403,7 @@ class LLMStructuredPrompt(typing.Generic[B, T]):
     @track_hyperparameters
     def query(self, language_model_or_chat_chain, schema):
         # create the prompt
-        json_dumps_kwargs = Hyperparameter("json_dumps_kwargs") @ dict(indent=0)
+        json_dumps_kwargs = Hyperparameter("json_dumps_kwargs") @ dict(indent=None)
         additional_definitions_prompt_template = Hyperparameter(
             "additional_definitions_prompt_template",
             "Here is the schema for additional data types:\n" "```\n" "{additional_definitions}\n" "```\n" "\n",
