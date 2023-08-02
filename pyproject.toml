@@ -64,10 +64,10 @@ markdown = "<3.4"
 pydantic = "^1.10.2"
 wandb = "^0.15.0"
 protobuf = ">=3.20.0,<3.21.0"
-pynecone = "^0.1.29"
 watchdog = "2.3.1"
 types-requests = "^2.30.0.0"
 svgwrite = "^1.4.3"
+llmtracer = "^1.0.0"
 
 [tool.poetry.extras]
 test = [

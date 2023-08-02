@@ -32,14 +32,14 @@ import typing_extensions
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms import BaseLLM
 from langchain.schema import BaseLanguageModel, OutputParserException
+from llmtracer import TraceNodeKind, trace_calls, update_event_properties, update_name
+from llmtracer.trace_builder import slicer
 from pydantic import BaseModel, ValidationError, create_model, generics
 from pydantic.fields import FieldInfo, Undefined
 from pydantic.generics import replace_types
 
 from blackboard_pagi.prompt_optimizer.track_hyperparameters import Hyperparameter, track_hyperparameters
 from blackboard_pagi.prompts.chat_chain import ChatChain
-from blackboard_pagi.utils.tracer import TraceNodeKind, trace_calls, update_event_properties, update_name
-from blackboard_pagi.utils.tracer.trace_builder import slicer
 
 T = typing.TypeVar("T")
 S = typing.TypeVar("S")

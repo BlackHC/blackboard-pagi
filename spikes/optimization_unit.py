@@ -27,6 +27,7 @@ from langchain.cache import SQLiteCache
 from langchain.chat_models import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langchain.schema import OutputParserException
+from llmtracer import JsonFileWriter, TraceViewerIntegration, wandb_tracer
 from openai import OpenAIError
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
@@ -48,8 +49,6 @@ from blackboard_pagi.prompt_optimizer.track_hyperparameters import (
     track_hyperparameters,
 )
 from blackboard_pagi.prompts.chat_chain import ChatChain
-from blackboard_pagi.utils.tracer import JsonFileWriter, TraceViewerIntegration, build_trace
-from blackboard_pagi.utils.tracer.wandb_integration import wandb_tracer
 
 langchain.llm_cache = SQLiteCache(".optimization_unit.langchain.db")
 

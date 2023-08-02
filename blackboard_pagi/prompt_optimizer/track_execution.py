@@ -20,12 +20,11 @@ from typing import List, Optional
 from langchain.chat_models.base import BaseChatModel
 from langchain.llms import BaseLLM
 from langchain.schema import BaseLanguageModel, BaseMessage, ChatMessage, ChatResult, LLMResult
+from llmtracer import TraceNodeKind, trace_calls, trace_object_converter
+from llmtracer.object_converter import ObjectConverter
 from pydantic import BaseModel, Field
 
 from blackboard_pagi.prompts.chat_chain import ChatChain
-from blackboard_pagi.utils.tracer import TraceNodeKind, trace_calls
-from blackboard_pagi.utils.tracer.object_converter import ObjectConverter
-from blackboard_pagi.utils.tracer.trace_builder import trace_object_converter
 
 T = typing.TypeVar("T")
 P = typing.ParamSpec("P")
