@@ -6,7 +6,25 @@
 [![Build Status](https://github.com/blackhc/blackboard-pagi/actions/workflows/dev.yml/badge.svg)](https://github.com/blackhc/blackboard-pagi/actions/workflows/dev.yml)
 [![codecov](https://codecov.io/gh/blackhc/blackboard-pagi/branch/main/graphs/badge.svg)](https://codecov.io/github/blackhc/blackboard-pagi)
 
+> **Warning**
+> This is a research project and does not do what the name implies at all currently.
+>
+> The repo was started for the LLM Hackathon by Ben's Bites but then became more of an infrastructure playground.
 
+Highlights:
+
+- Hyperparameter tracking;
+- LLM execution tracking;
+- Advanced @llm_function decorator that truly supports **generic** Pydantic models;
+- Black-Box Function Optimization example using LLM and generic task description.
+
+Everything released under AGPL 3.0.
+
+I hope to contribute and extract the infrastructure features to other projects and packages.
+
+Feel free to contact me if there is interest.
+
+---
 
 Proto-AGI using a Blackboard System (for the LLM Hackathon by Ben's Bites)
 
