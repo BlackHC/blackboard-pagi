@@ -9,7 +9,7 @@
 > **Warning**
 > This is a research project and does not do what the name implies at all currently.
 >
-> The repo was started for the LLM Hackathon by Ben's Bites but then became more of an infrastructure playground.
+> The repo was started for the LLM Hackathon by Ben's Bites (winter 2022) but then became more of an infrastructure playground.
 
 Highlights:
 
